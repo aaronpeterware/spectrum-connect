@@ -27,6 +27,8 @@ import CreatePostScreen from './src/screens/CreatePostScreen';
 import CallScreen from './src/screens/CallScreen';
 import PostDetailScreen from './src/screens/PostDetailScreen';
 import UserProfileScreen from './src/screens/UserProfileScreen';
+import AudioLessonsScreen from './src/screens/AudioLessonsScreen';
+import AudioLessonScreen from './src/screens/AudioLessonScreen';
 
 // Context
 import { PostsProvider } from './src/context/PostsContext';
@@ -52,6 +54,8 @@ export type RootStackParamList = {
   Matches: undefined;
   PostDetail: { postId: string };
   UserProfile: { userId: string; name: string; avatar?: string };
+  AudioLessons: undefined;
+  AudioLesson: { scenarioId: string };
 };
 
 export type MainTabParamList = {
@@ -210,6 +214,16 @@ export default function App() {
               name="UserProfile"
               component={UserProfileScreen}
               options={{ animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+              name="AudioLessons"
+              component={AudioLessonsScreen}
+              options={{ animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+              name="AudioLesson"
+              component={AudioLessonScreen}
+              options={{ animation: 'slide_from_bottom', gestureEnabled: false }}
             />
               </Stack.Navigator>
                 </NavigationContainer>

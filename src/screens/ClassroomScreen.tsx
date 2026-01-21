@@ -240,6 +240,36 @@ const ClassroomScreen = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* Audio Lessons Feature Card */}
+        <TouchableOpacity
+          style={styles.audioLessonsCard}
+          onPress={() => navigation.navigate('AudioLessons')}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={['#8B5CF6', '#6366F1']}
+            style={styles.audioLessonsGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={styles.audioLessonsIcon}>
+              <Ionicons name="ear" size={28} color="white" />
+            </View>
+            <View style={styles.audioLessonsContent}>
+              <View style={styles.audioLessonsHeader}>
+                <Text style={styles.audioLessonsTitle}>Audio Lessons</Text>
+                <View style={styles.newFeatureBadge}>
+                  <Text style={styles.newFeatureText}>NEW</Text>
+                </View>
+              </View>
+              <Text style={styles.audioLessonsDescription}>
+                Listen to conversations and identify social cues
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="white" />
+          </LinearGradient>
+        </TouchableOpacity>
+
         {activeTab === 'modules' ? (
           <>
             {MODULES.map((module, index) => (
@@ -716,6 +746,55 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: 'white',
+  },
+  // Audio Lessons Card
+  audioLessonsCard: {
+    marginBottom: Spacing.lg,
+    borderRadius: BorderRadius.xl,
+    overflow: 'hidden',
+  },
+  audioLessonsGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.lg,
+  },
+  audioLessonsIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  audioLessonsContent: {
+    flex: 1,
+  },
+  audioLessonsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  audioLessonsTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  newFeatureBadge: {
+    backgroundColor: '#FFD700',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  newFeatureText: {
+    color: '#1A1A2E',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  audioLessonsDescription: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 13,
+    marginTop: 4,
   },
 });
 
