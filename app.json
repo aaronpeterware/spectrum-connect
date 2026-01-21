@@ -1,30 +1,63 @@
 {
   "expo": {
-    "name": "spectrum-app",
-    "slug": "spectrum-app",
+    "name": "Spectrum Connect",
+    "slug": "spectrum-connect",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "scheme": "spectrumconnect",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#F8FAFC"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.aaronware.spectrumconnect",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Spectrum Connect needs camera access to take profile photos and share moments.",
+        "NSPhotoLibraryUsageDescription": "Spectrum Connect needs photo library access to select profile photos.",
+        "NSMicrophoneUsageDescription": "Spectrum Connect needs microphone access for voice conversations with AI companions.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#F8FAFC"
       },
+      "package": "com.aaronware.spectrumconnect",
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Spectrum Connect to access your camera for photos."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Spectrum Connect to access your photos."
+        }
+      ]
+    ],
+    "owner": "aaronwares-organization",
+    "extra": {
+      "eas": {
+        "projectId": "a7ef7c6f-2a67-4f45-83fe-de4844867461"
+      }
     }
   }
 }
