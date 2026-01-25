@@ -8,6 +8,8 @@ import {
   Dimensions,
   Image,
   ActivityIndicator,
+  Modal,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,48 +17,26 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../constants/theme';
+import { COMPANIONS, getCompanionById } from '../data/companionProfiles';
+import { getLocalImage } from '../data/localImages';
+import { useUser } from '../context/UserContext';
+import { useTheme } from '../hooks/useTheme';
 
 import { API_CONFIG } from '../config/api';
 
 const API_URL = API_CONFIG.API_URL;
 
-// Fallback images for companions when API fails
-const companionImages: Record<string, string> = {
-  megan: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=600&fit=crop&crop=face',
-  grace: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&h=600&fit=crop&crop=face',
-  julia: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=600&fit=crop&crop=face',
-  bianca: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=600&fit=crop&crop=face',
-  julian: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=600&fit=crop&crop=face',
-  luca: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop&crop=face',
-  sarah: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=600&fit=crop&crop=face',
-  emma: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&h=600&fit=crop&crop=face',
-  sophia: 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=400&h=600&fit=crop&crop=face',
-  isabella: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400&h=600&fit=crop&crop=face',
-  olivia: 'https://images.unsplash.com/photo-1557555187-23d685287bc3?w=400&h=600&fit=crop&crop=face',
-  ava: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=400&h=600&fit=crop&crop=face',
-  mia: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&h=600&fit=crop&crop=face',
-  charlotte: 'https://images.unsplash.com/photo-1541823709867-1b206113eafd?w=400&h=600&fit=crop&crop=face',
-  amelia: 'https://images.unsplash.com/photo-1524250502761-1ac6f2e30d43?w=400&h=600&fit=crop&crop=face',
-  harper: 'https://images.unsplash.com/photo-1489424731084-a5d8b219a5bb?w=400&h=600&fit=crop&crop=face',
-  evelyn: 'https://images.unsplash.com/photo-1496440737103-cd596325d314?w=400&h=600&fit=crop&crop=face',
-  luna: 'https://images.unsplash.com/photo-1520466809213-7b9a56adcd45?w=400&h=600&fit=crop&crop=face',
-  aria: 'https://images.unsplash.com/photo-1514315384763-ba401779410f?w=400&h=600&fit=crop&crop=face',
-  chloe: 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=400&h=600&fit=crop&crop=face',
-  james: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=600&fit=crop&crop=face',
-  ethan: 'https://images.unsplash.com/photo-1463453091185-61582044d556?w=400&h=600&fit=crop&crop=face',
-  noah: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&h=600&fit=crop&crop=face',
-  oliver: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=600&fit=crop&crop=face',
-  lucas: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=400&h=600&fit=crop&crop=face',
-  mason: 'https://images.unsplash.com/photo-1507081323647-4d250478b919?w=400&h=600&fit=crop&crop=face',
-  aiden: 'https://images.unsplash.com/photo-1531891437562-4301cf35b7e4?w=400&h=600&fit=crop&crop=face',
-  daniel: 'https://images.unsplash.com/photo-1504257432389-52343af06ae3?w=400&h=600&fit=crop&crop=face',
-  alexander: 'https://images.unsplash.com/photo-1522556189639-b150ed9c4330?w=400&h=600&fit=crop&crop=face',
-  michael: 'https://images.unsplash.com/photo-1534030347209-467a5b0ad3e6?w=400&h=600&fit=crop&crop=face',
-};
+// Create fallback image lookup from companion profiles
+const companionImages: Record<string, string> = {};
+COMPANIONS.forEach(c => {
+  companionImages[c.id] = c.profileImage;
+});
 
 type RootStackParamList = {
   CompanionProfile: { companionId: string };
   Companion: { companionId: string };
+  Call: { companionId: string };
+  Chat: { conversationId: string; name: string; avatar?: string; isOnline?: boolean; companionId?: string };
 };
 
 type CompanionData = {
@@ -74,39 +54,82 @@ const { width, height } = Dimensions.get('window');
 const IMAGE_HEIGHT = height * 0.6;
 
 const CompanionProfileScreen = () => {
+  const { colors, isDark } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'CompanionProfile'>>();
-  const companionId = route.params?.companionId || 'megan';
+  const companionId = route.params?.companionId || 'sophia';
+  const { toggleFavoriteCompanion, isFavoriteCompanion } = useUser();
 
   const [companion, setCompanion] = useState<CompanionData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isFavorite, setIsFavorite] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const isFavorite = isFavoriteCompanion(companionId);
+
+  const handleReportUser = () => {
+    setMenuVisible(false);
+    Alert.alert(
+      'Report User',
+      'Thank you for helping keep Haven safe. What would you like to report?',
+      [
+        { text: 'Inappropriate Content', onPress: () => Alert.alert('Report Submitted', 'Our team will review this report.') },
+        { text: 'Abusive Behaviour', onPress: () => Alert.alert('Report Submitted', 'Our team will review this report.') },
+        { text: 'Spam', onPress: () => Alert.alert('Report Submitted', 'Our team will review this report.') },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const handleBlockUser = () => {
+    setMenuVisible(false);
+    Alert.alert(
+      'Block User',
+      `Are you sure you want to block ${companion?.name}? You won't see their content anymore.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert('User Blocked', `${companion?.name} has been blocked.`);
+            navigation.goBack();
+          },
+        },
+      ]
+    );
+  };
 
   useEffect(() => {
     fetchCompanionData();
   }, [companionId]);
 
   const fetchCompanionData = async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/companions?id=${companionId}`);
-      const data = await response.json();
-      setCompanion(data);
-    } catch (error) {
-      if (__DEV__) console.error('Error fetching companion:', error);
-      const fallbackImage = companionImages[companionId] || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=600&fit=crop&crop=face';
+    // Use local companion profile data directly
+    const localCompanion = getCompanionById(companionId);
+    if (localCompanion) {
+      setCompanion({
+        id: localCompanion.id,
+        name: localCompanion.name,
+        age: localCompanion.age,
+        location: localCompanion.location,
+        description: localCompanion.description,
+        gender: localCompanion.gender,
+        images: localCompanion.gallery,
+        profileImage: localCompanion.profileImage,
+      });
+    } else {
+      const fallbackImage = companionImages[companionId] || 'https://randomuser.me/api/portraits/women/39.jpg';
       setCompanion({
         id: companionId,
         name: companionId.charAt(0).toUpperCase() + companionId.slice(1),
         age: 25,
-        location: 'Unknown',
+        location: 'Australia',
         description: 'A wonderful companion waiting to meet you.',
         gender: 'female',
         images: [fallbackImage],
         profileImage: fallbackImage,
       });
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   const getImageUrl = (imagePath: string) => {
@@ -116,9 +139,17 @@ const CompanionProfileScreen = () => {
     return `${API_URL}${imagePath}`;
   };
 
+  const getImageSource = () => {
+    const localImage = getLocalImage(companionId);
+    if (localImage) {
+      return localImage;
+    }
+    return { uri: getImageUrl(companion?.profileImage || '') };
+  };
+
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
@@ -126,18 +157,18 @@ const CompanionProfileScreen = () => {
 
   if (!companion) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.errorText}>Companion not found</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <Text style={[styles.errorText, { color: colors.text }]}>Companion not found</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Profile Image */}
       <View style={styles.imageContainer}>
         <Image
-          source={{ uri: getImageUrl(companion.profileImage) }}
+          source={getImageSource()}
           style={styles.image}
           resizeMode="cover"
         />
@@ -153,7 +184,7 @@ const CompanionProfileScreen = () => {
           <View style={styles.headerRight}>
             <TouchableOpacity
               style={styles.headerButton}
-              onPress={() => setIsFavorite(!isFavorite)}
+              onPress={() => toggleFavoriteCompanion(companionId)}
             >
               <Ionicons
                 name={isFavorite ? 'heart' : 'heart-outline'}
@@ -161,7 +192,7 @@ const CompanionProfileScreen = () => {
                 color={isFavorite ? '#FF4B6E' : 'white'}
               />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.headerButton}>
+            <TouchableOpacity style={styles.headerButton} onPress={() => setMenuVisible(true)}>
               <Ionicons name="ellipsis-vertical" size={24} color="white" />
             </TouchableOpacity>
           </View>
@@ -169,7 +200,7 @@ const CompanionProfileScreen = () => {
 
         {/* Gradient overlay */}
         <LinearGradient
-          colors={['transparent', 'transparent', 'rgba(26,26,46,0.95)']}
+          colors={['transparent', 'transparent', isDark ? 'rgba(26,26,46,0.95)' : 'rgba(255,255,255,0.95)']}
           locations={[0, 0.5, 1]}
           style={styles.imageGradient}
           pointerEvents="none"
@@ -181,8 +212,8 @@ const CompanionProfileScreen = () => {
         {/* Name and Status Row */}
         <View style={styles.nameRow}>
           <View style={styles.nameContainer}>
-            <Text style={styles.name}>{companion.name}</Text>
-            <Text style={styles.age}>{companion.age}</Text>
+            <Text style={[styles.name, { color: colors.text }]}>{companion.name}</Text>
+            <Text style={[styles.age, { color: colors.textSecondary }]}>{companion.age}</Text>
             <View style={styles.verifiedBadge}>
               <Ionicons name="checkmark-circle" size={22} color="#4DA6FF" />
             </View>
@@ -195,9 +226,9 @@ const CompanionProfileScreen = () => {
 
         {/* Location */}
         <View style={styles.locationRow}>
-          <Ionicons name="location-outline" size={18} color={Colors.gray400} />
-          <Text style={styles.location}>{companion.location}</Text>
-          <Text style={styles.distance}>• 2 km away</Text>
+          <Ionicons name="location-outline" size={18} color={colors.textSecondary} />
+          <Text style={[styles.location, { color: colors.textSecondary }]}>{companion.location}</Text>
+          <Text style={[styles.distance, { color: colors.textSecondary }]}>• 2 km away</Text>
         </View>
 
         {/* Bio */}
@@ -206,25 +237,25 @@ const CompanionProfileScreen = () => {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.bioContent}
         >
-          <Text style={styles.bio}>{companion.description}</Text>
+          <Text style={[styles.bio, { color: colors.text }]}>{companion.description}</Text>
 
           {/* Interest Tags */}
           <View style={styles.interestsContainer}>
-            <View style={styles.interestTag}>
+            <View style={[styles.interestTag, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
               <Text style={styles.interestEmoji}>💬</Text>
-              <Text style={styles.interestText}>Chatty</Text>
+              <Text style={[styles.interestText, { color: colors.text }]}>Chatty</Text>
             </View>
-            <View style={styles.interestTag}>
+            <View style={[styles.interestTag, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
               <Text style={styles.interestEmoji}>🎭</Text>
-              <Text style={styles.interestText}>Roleplay</Text>
+              <Text style={[styles.interestText, { color: colors.text }]}>Roleplay</Text>
             </View>
-            <View style={styles.interestTag}>
+            <View style={[styles.interestTag, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
               <Text style={styles.interestEmoji}>💕</Text>
-              <Text style={styles.interestText}>Flirty</Text>
+              <Text style={[styles.interestText, { color: colors.text }]}>Flirty</Text>
             </View>
-            <View style={styles.interestTag}>
+            <View style={[styles.interestTag, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
               <Text style={styles.interestEmoji}>🌙</Text>
-              <Text style={styles.interestText}>Night owl</Text>
+              <Text style={[styles.interestText, { color: colors.text }]}>Night owl</Text>
             </View>
           </View>
         </ScrollView>
@@ -234,29 +265,60 @@ const CompanionProfileScreen = () => {
           {/* Call Button - iPhone Green */}
           <TouchableOpacity
             style={styles.iphoneButton}
-            onPress={() => navigation.navigate('Companion', { companionId })}
+            onPress={() => navigation.navigate('Call', { companionId })}
           >
             <View style={[styles.iphoneButtonInner, styles.callButtonBg]}>
               <Ionicons name="call" size={28} color="white" />
             </View>
-            <Text style={styles.iphoneButtonLabel}>Call</Text>
+            <Text style={[styles.iphoneButtonLabel, { color: colors.text }]}>Call</Text>
           </TouchableOpacity>
 
           {/* Message Button - iPhone Blue */}
           <TouchableOpacity
             style={styles.iphoneButton}
-            onPress={() => navigation.navigate('Companion', { companionId })}
+            onPress={() => navigation.navigate('Chat', {
+              conversationId: companionId,
+              name: companion?.name || 'Unknown',
+              isOnline: true,
+              companionId: companionId,
+            })}
           >
             <View style={[styles.iphoneButtonInner, styles.messageButtonBg]}>
               <Ionicons name="chatbubble" size={26} color="white" />
             </View>
-            <Text style={styles.iphoneButtonLabel}>Message</Text>
+            <Text style={[styles.iphoneButtonLabel, { color: colors.text }]}>Message</Text>
           </TouchableOpacity>
         </View>
 
         {/* Bottom Safety Padding */}
         <View style={styles.bottomPadding} />
       </View>
+
+      {/* Report/Block Menu Modal */}
+      <Modal
+        visible={menuVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => setMenuVisible(false)}
+        >
+          <View style={[styles.menuContainer, { backgroundColor: colors.cardBackground }]}>
+            <TouchableOpacity style={styles.menuItem} onPress={handleReportUser}>
+              <Ionicons name="flag" size={22} color={Colors.warning} />
+              <Text style={[styles.menuItemText, { color: colors.text }]}>Report User</Text>
+            </TouchableOpacity>
+            <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+            <TouchableOpacity style={styles.menuItem} onPress={handleBlockUser}>
+              <Ionicons name="ban" size={22} color={Colors.error} />
+              <Text style={[styles.menuItemText, { color: Colors.error }]}>Block User</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -444,6 +506,31 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 10,
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuContainer: {
+    width: width * 0.8,
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    gap: 12,
+  },
+  menuItemText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  menuDivider: {
+    height: 1,
+    marginHorizontal: Spacing.md,
   },
 });
 

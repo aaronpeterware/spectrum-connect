@@ -1,0 +1,36 @@
+{
+  "name": "nanobanana",
+  "version": "1.0.17",
+  "description": "Image generation with Gemini (Nano Banana Pro)",
+  "author": "cliforai",
+  "license": "BUSL-1.1",
+  "entry": "dist/run.js",
+  "runtime": "node",
+  "keywords": [
+    "gemini",
+    "image",
+    "generation",
+    "ai",
+    "browser"
+  ],
+  "commands": {
+    "image": {
+      "description": "Generate image with Gemini",
+      "args": [
+        {
+          "name": "prompt",
+          "required": true
+        }
+      ]
+    }
+  },
+  "dependencies": {
+    "@cli4ai/lib": "^1.0.9",
+    "puppeteer": "^24.0.0",
+    "commander": "^14.0.0"
+  },
+  "mcp": {
+    "enabled": true,
+    "transport": "stdio"
+  }
+}

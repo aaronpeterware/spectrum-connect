@@ -1,0 +1,53 @@
+{
+  "name": "@cli4ai/nanobanana",
+  "version": "1.0.18",
+  "description": "Image generation with Gemini (Nano Banana Pro)",
+  "author": "cliforai",
+  "license": "BUSL-1.1",
+  "main": "dist/run.js",
+  "bin": {
+    "nanobanana": "./dist/run.js"
+  },
+  "type": "module",
+  "keywords": [
+    "cli4ai",
+    "cli",
+    "ai-tools",
+    "gemini",
+    "image",
+    "generation",
+    "ai",
+    "browser"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cliforai/packages",
+    "directory": "packages/nanobanana"
+  },
+  "homepage": "https://github.com/cliforai/packages/tree/main/packages/nanobanana",
+  "bugs": {
+    "url": "https://github.com/cliforai/packages/issues"
+  },
+  "dependencies": {
+    "@cli4ai/lib": "^1.0.9",
+    "commander": "^14.0.2",
+    "puppeteer": "^24.35.0"
+  },
+  "files": [
+    "dist",
+    "cli4ai.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.0.0"
+  }
+}

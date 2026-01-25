@@ -10,6 +10,7 @@ import {
   Platform,
   Keyboard,
   Image,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -20,50 +21,39 @@ import * as Haptics from 'expo-haptics';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { TypingIndicator } from '../components/ai/TypingIndicator';
 import { CalmBackground } from '../components/backgrounds/CalmBackground';
+import { getCompanionById, COMPANIONS } from '../data/companionProfiles';
+import { getLocalImage } from '../data/localImages';
 
 import { API_CONFIG } from '../config/api';
 
 const API_URL = API_CONFIG.API_URL;
 
-// Companion data - shared with CompanionsScreen
-const companionData: Record<string, {
-  name: string;
-  age: number;
-  location: string;
-  description: string;
-  imageUrl: string;
-  gender: string;
-}> = {
-  megan: { name: 'Megan', age: 25, location: 'Copenhagen', description: "I design cozy spaces for a living, so I'm an expert in staying in bed all day.", imageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop&crop=face', gender: 'female' },
-  grace: { name: 'Grace', age: 27, location: 'Seoul', description: "International consultant. I've lived in twelve countries and speak five languages.", imageUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&h=200&fit=crop&crop=face', gender: 'female' },
-  julia: { name: 'Julia', age: 26, location: 'Beverly Hills', description: 'Aesthetic Nurse at the most exclusive clinic in Beverly Hills.', imageUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=face', gender: 'female' },
-  bianca: { name: 'Bianca', age: 26, location: 'Milan', description: 'Formula 1 PR Manager living life in the fast lane.', imageUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop&crop=face', gender: 'female' },
-  raven: { name: 'Raven', age: 27, location: 'Seattle', description: 'Soft spot for vintage costumes and strong values.', imageUrl: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200&h=200&fit=crop&crop=face', gender: 'female' },
-  skye: { name: 'Skye', age: 26, location: 'Austin', description: 'I mix drinks, push buttons, and keep things interesting.', imageUrl: 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=200&h=200&fit=crop&crop=face', gender: 'female' },
-  sarah: { name: 'Sarah', age: 51, location: 'Sydney', description: 'Pilates every morning. Sweetheart by nature, flirt by accident.', imageUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&h=200&fit=crop&crop=face', gender: 'female' },
-  paige: { name: 'Paige', age: 25, location: 'Las Vegas', description: 'I teach yoga, perform on stage, and love being the center of attention.', imageUrl: 'https://images.unsplash.com/photo-1502823403499-6ccfcf4fb453?w=200&h=200&fit=crop&crop=face', gender: 'female' },
-  claire: { name: 'Claire', age: 23, location: 'Dallas', description: 'I grew up in comfort, but fashion became my real passion.', imageUrl: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=200&h=200&fit=crop&crop=face', gender: 'female' },
-  monica: { name: 'Monica', age: 27, location: 'Colorado', description: "I help athletes recover and I'm obsessed with roleplay and storytelling.", imageUrl: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=200&h=200&fit=crop&crop=face', gender: 'female' },
-  poppy: { name: 'Poppy', age: 25, location: 'Ireland', description: "I can be a little clumsy off the green, but at least it's good for a laugh.", imageUrl: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=200&h=200&fit=crop&crop=face', gender: 'female' },
-  clara: { name: 'Clara', age: 30, location: 'Ukraine', description: 'Caregiver, big sister, part-time dreamer.', imageUrl: 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=200&h=200&fit=crop&crop=face', gender: 'female' },
-  kylie: { name: 'Kylie', age: 21, location: 'Ohio', description: 'Fashion girly with a love for coffee, thrifting & a lil bit of trouble.', imageUrl: 'https://images.unsplash.com/photo-1489424731084-a5d8b219a5bb?w=200&h=200&fit=crop&crop=face', gender: 'female' },
-  liv: { name: 'Liv', age: 18, location: 'Oslo', description: 'Just a girl with skates, a loud laugh, and new to love.', imageUrl: 'https://images.unsplash.com/photo-1496440737103-cd596325d314?w=200&h=200&fit=crop&crop=face', gender: 'female' },
-  amara: { name: 'Amara', age: 24, location: 'Boston', description: 'I create visual art by day and explore the artistry of restraint by night.', imageUrl: 'https://images.unsplash.com/photo-1534751516642-a1af1ef26a56?w=200&h=200&fit=crop&crop=face', gender: 'female' },
-  chloe: { name: 'Chloe', age: 25, location: 'Asheville', description: 'Nature girl that loves slow mornings, board games and deep convos.', imageUrl: 'https://images.unsplash.com/photo-1464863979621-258859e62245?w=200&h=200&fit=crop&crop=face', gender: 'female' },
-  daisy: { name: 'Daisy', age: 28, location: 'New York', description: "I built my life on my own terms, and I don't apologize for it.", imageUrl: 'https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=200&h=200&fit=crop&crop=face', gender: 'female' },
-  julian: { name: 'Julian', age: 27, location: 'Florida', description: 'Outgoing and always in the mix. I keep it light, fun, and fast-paced.', imageUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop&crop=face', gender: 'male' },
-  luca: { name: 'Luca', age: 27, location: 'Tokyo', description: 'Expressive and full of heart, I chase beauty across borders.', imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face', gender: 'male' },
-  malik: { name: 'Malik', age: 35, location: 'Georgia', description: "Calm presence, sharp mind. I don't say much unless it matters.", imageUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&h=200&fit=crop&crop=face', gender: 'male' },
-  zayn: { name: 'Zayn', age: 34, location: 'Dubai', description: 'Confidence meets clarity. I run a real estate firm in Dubai.', imageUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop&crop=face', gender: 'male' },
-  sebastian: { name: 'Sebastian', age: 23, location: 'Vancouver', description: 'Energy? Always. Music, fitness, and friends keep me going.', imageUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200&h=200&fit=crop&crop=face', gender: 'male' },
-  rohan: { name: 'Rohan', age: 28, location: 'Toronto', description: "Logic and quiet confidence - that's my thing.", imageUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=200&h=200&fit=crop&crop=face', gender: 'male' },
-  aaron: { name: 'Aaron', age: 28, location: 'Geneva', description: 'I bring precision and calm to everything I do.', imageUrl: 'https://images.unsplash.com/photo-1463453091185-61582044d556?w=200&h=200&fit=crop&crop=face', gender: 'male' },
-  marwick: { name: 'Marwick', age: 32, location: 'Singapore', description: 'I see the details most people skip. Finance by day, photography when I can.', imageUrl: 'https://images.unsplash.com/photo-1507591064344-4c6ce005b128?w=200&h=200&fit=crop&crop=face', gender: 'male' },
-  parker: { name: 'Parker', age: 34, location: 'Massachusetts', description: 'History Professor with a passion for discipline and structure.', imageUrl: 'https://images.unsplash.com/photo-1504257432389-52343af06ae3?w=200&h=200&fit=crop&crop=face', gender: 'male' },
-  jayden: { name: 'Jayden', age: 32, location: 'Monte Carlo', description: 'Fixer for the elite in Monte Carlo. I make problems disappear.', imageUrl: 'https://images.unsplash.com/photo-1480429370612-2f1bbfc2b48e?w=200&h=200&fit=crop&crop=face', gender: 'male' },
-  noah: { name: 'Noah', age: 26, location: 'Los Angeles', description: 'Professional basketball player who lives for the win.', imageUrl: 'https://images.unsplash.com/photo-1531384441138-2736e62e0919?w=200&h=200&fit=crop&crop=face', gender: 'male' },
-  roman: { name: 'Roman', age: 25, location: 'Tokyo', description: 'High-performance mechanic and night racer.', imageUrl: 'https://images.unsplash.com/photo-1528892952291-009c663ce843?w=200&h=200&fit=crop&crop=face', gender: 'male' },
-  quinn: { name: 'Quinn', age: 29, location: 'Sacramento', description: 'Quiet, deep-thinking, and all about the craft.', imageUrl: 'https://images.unsplash.com/photo-1545167622-3a6ac756afa4?w=200&h=200&fit=crop&crop=face', gender: 'male' },
+// Suggested messages / icebreakers
+const SUGGESTED_MESSAGES = {
+  default: [
+    "What's something you're really into lately?",
+    "Tell me about your favorite way to relax",
+    "What's your current hyperfixation?",
+    "What made you smile today?",
+  ],
+  feelings: [
+    "I'm feeling a bit anxious today",
+    "I had a really good day!",
+    "I'm not sure how I'm feeling",
+    "Something's been on my mind",
+  ],
+  advice: [
+    "Can you help me with something?",
+    "What do you think about...",
+    "I need some advice about socializing",
+    "How do I handle awkward silences?",
+  ],
+  practice: [
+    "Can we practice small talk?",
+    "Help me prepare for a conversation",
+    "Let's roleplay a social scenario",
+    "How do I start a conversation?",
+  ],
 };
 
 type RootStackParamList = {
@@ -83,8 +73,16 @@ type AIState = 'online' | 'thinking' | 'speaking' | 'listening';
 const CompanionScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'Companion'>>();
-  const companionId = route.params?.companionId || 'megan';
-  const companion = companionData[companionId] || companionData.megan;
+  const companionId = route.params?.companionId || 'sophia';
+  const companionProfile = getCompanionById(companionId) || COMPANIONS[0];
+  const companion = {
+    name: companionProfile.name,
+    age: companionProfile.age,
+    location: companionProfile.location,
+    description: companionProfile.description,
+    imageUrl: companionProfile.profileImage,
+    gender: companionProfile.gender,
+  };
   const flatListRef = useRef<FlatList>(null);
 
   const [messages, setMessages] = useState<Message[]>([
@@ -100,6 +98,9 @@ const CompanionScreen = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [calmMode, setCalmMode] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestionCategory, setSuggestionCategory] = useState<keyof typeof SUGGESTED_MESSAGES>('default');
+  const inputRef = useRef<TextInput>(null);
 
   const sendMessage = async () => {
     if (!inputText.trim()) return;
@@ -182,6 +183,23 @@ const CompanionScreen = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
 
+  const handleSelectSuggestion = (suggestion: string) => {
+    setInputText(suggestion);
+    setShowSuggestions(false);
+    inputRef.current?.focus();
+  };
+
+  const toggleSuggestions = () => {
+    setShowSuggestions(!showSuggestions);
+    // Cycle through suggestion categories
+    if (!showSuggestions) {
+      const categories = Object.keys(SUGGESTED_MESSAGES) as (keyof typeof SUGGESTED_MESSAGES)[];
+      const currentIndex = categories.indexOf(suggestionCategory);
+      const nextIndex = (currentIndex + 1) % categories.length;
+      setSuggestionCategory(categories[nextIndex]);
+    }
+  };
+
   const renderMessage = ({ item }: { item: Message }) => {
     const isUser = item.sender === 'user';
 
@@ -228,7 +246,7 @@ const CompanionScreen = () => {
           <View style={styles.headerCenter}>
             {!imageError ? (
               <Image
-                source={{ uri: companion.imageUrl }}
+                source={getLocalImage(companionId) || { uri: companion.imageUrl }}
                 style={styles.headerAvatar}
                 onError={() => setImageError(true)}
               />
@@ -283,8 +301,44 @@ const CompanionScreen = () => {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={0}
         >
+          {/* Suggestions / Icebreakers */}
+          {showSuggestions && (
+            <View style={styles.suggestionsContainer}>
+              <View style={styles.suggestionsHeader}>
+                <Ionicons name="sparkles" size={14} color={Colors.primary} />
+                <Text style={styles.suggestionsLabel}>Suggestions</Text>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.suggestionsScroll}
+              >
+                {SUGGESTED_MESSAGES[suggestionCategory].map((suggestion, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.suggestionChip}
+                    onPress={() => handleSelectSuggestion(suggestion)}
+                  >
+                    <Text style={styles.suggestionText}>{suggestion}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
           <View style={styles.inputContainer}>
+            <TouchableOpacity
+              style={[styles.suggestionButton, showSuggestions && styles.suggestionButtonActive]}
+              onPress={toggleSuggestions}
+            >
+              <Ionicons
+                name="bulb"
+                size={22}
+                color={showSuggestions ? Colors.primary : Colors.gray400}
+              />
+            </TouchableOpacity>
             <TextInput
+              ref={inputRef}
               style={styles.input}
               value={inputText}
               onChangeText={setInputText}
@@ -502,6 +556,54 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: 'white',
     fontWeight: '600',
+  },
+  // Suggestions styles
+  suggestionsContainer: {
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.xs,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderTopWidth: 1,
+    borderTopColor: Colors.gray200,
+  },
+  suggestionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.xs,
+    gap: 6,
+  },
+  suggestionsLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Colors.gray400,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  suggestionsScroll: {
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  suggestionChip: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.gray200,
+    borderRadius: 20,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginRight: Spacing.sm,
+  },
+  suggestionText: {
+    fontSize: 13,
+    color: Colors.gray700,
+    fontWeight: '500',
+  },
+  suggestionButton: {
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: Colors.gray100,
+  },
+  suggestionButtonActive: {
+    backgroundColor: `${Colors.primary}15`,
   },
 });
 

@@ -1,38 +1,49 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as InAppPurchases from 'expo-in-app-purchases';
-import purchaseService, {
+import {
+  initializeRevenueCat,
+  loginUser,
+  logoutUser,
+  getCustomerInfo,
+  checkHavenProAccess,
+  getOfferings,
+  purchasePackage,
+  restorePurchases as restoreRevenueCatPurchases,
+  addCustomerInfoUpdateListener,
+  ENTITLEMENT_ID,
   PRODUCT_IDS,
-  MOMENT_AMOUNTS,
-  SUBSCRIPTION_MOMENTS,
-  PurchaseResult,
-} from '../services/PurchaseService';
+} from '../services/revenueCatService';
+
+// Use any for RevenueCat types since native module may not be available
+type PurchasesPackage = any;
+type CustomerInfo = any;
+type PurchasesOfferings = any;
 
 // Storage keys
 const STORAGE_KEYS = {
-  MOMENTS_BALANCE: '@spectrum_moments_balance',
-  SUBSCRIPTION_TYPE: '@spectrum_subscription_type',
-  SUBSCRIPTION_EXPIRY: '@spectrum_subscription_expiry',
+  MOMENTS_BALANCE: '@haven_moments_balance',
+  LAST_RENEWAL_CHECK: '@haven_last_renewal_check',
 };
-
-// Subscription tiers
-export type SubscriptionTier = 'free' | 'pro' | 'premium';
 
 interface PurchaseContextType {
   // State
   momentsBalance: number;
-  subscriptionTier: SubscriptionTier;
+  isProUser: boolean;
   isLoading: boolean;
-  products: InAppPurchases.IAPItemDetails[];
-  subscriptions: InAppPurchases.IAPItemDetails[];
+  offerings: PurchasesOfferings | null;
+  customerInfo: CustomerInfo | null;
 
   // Actions
-  purchaseMoments: (productId: string) => Promise<PurchaseResult>;
-  purchaseSubscription: (productId: string) => Promise<PurchaseResult>;
-  restorePurchases: () => Promise<void>;
+  purchaseProduct: (pkg: PurchasesPackage) => Promise<{ success: boolean; error?: string }>;
+  restorePurchases: () => Promise<{ success: boolean; hasProAccess: boolean; error?: string }>;
   useMoments: (amount: number) => Promise<boolean>;
   addMoments: (amount: number) => Promise<void>;
-  refreshProducts: () => Promise<void>;
+  refreshOfferings: () => Promise<void>;
+  checkProAccess: () => Promise<boolean>;
+
+  // Voice call tracking
+  trackVoiceCallUsage: (durationSeconds: number) => Promise<{ success: boolean; momentsUsed: number; newBalance: number }>;
+  trackChatUsage: () => Promise<{ success: boolean; newBalance: number }>;
 }
 
 const PurchaseContext = createContext<PurchaseContextType | undefined>(undefined);
@@ -51,169 +62,156 @@ interface PurchaseProviderProps {
 
 export const PurchaseProvider: React.FC<PurchaseProviderProps> = ({ children }) => {
   const [momentsBalance, setMomentsBalance] = useState(500); // Start with 500 free moments
-  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('free');
+  const [isProUser, setIsProUser] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [products, setProducts] = useState<InAppPurchases.IAPItemDetails[]>([]);
-  const [subscriptions, setSubscriptions] = useState<InAppPurchases.IAPItemDetails[]>([]);
+  const [offerings, setOfferings] = useState<PurchasesOfferings | null>(null);
+  const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
 
-  // Load saved data on mount
+  // Initialize RevenueCat and load saved data
   useEffect(() => {
-    loadSavedData();
-    initializePurchases();
+    let unsubscribe: (() => void) | null = null;
+
+    const initialize = async () => {
+      try {
+        // Load saved moments balance
+        const savedMoments = await AsyncStorage.getItem(STORAGE_KEYS.MOMENTS_BALANCE);
+        if (savedMoments) {
+          setMomentsBalance(parseInt(savedMoments, 10));
+        }
+
+        // Initialize RevenueCat
+        await initializeRevenueCat();
+
+        // Get current customer info
+        const info = await getCustomerInfo();
+        setCustomerInfo(info);
+
+        // Check pro access
+        const hasProAccess = info.entitlements.active[ENTITLEMENT_ID] !== undefined;
+        setIsProUser(hasProAccess);
+
+        // Load offerings
+        const availableOfferings = await getOfferings();
+        setOfferings(availableOfferings);
+
+        // Listen for customer info updates
+        unsubscribe = addCustomerInfoUpdateListener((updatedInfo) => {
+          setCustomerInfo(updatedInfo);
+          const hasAccess = updatedInfo.entitlements.active[ENTITLEMENT_ID] !== undefined;
+          setIsProUser(hasAccess);
+          console.log('[PurchaseContext] Customer info updated, Pro access:', hasAccess);
+        });
+      } catch (error) {
+        console.error('[PurchaseContext] Initialization error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initialize();
 
     return () => {
-      purchaseService.disconnect();
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
   }, []);
-
-  const loadSavedData = async () => {
-    try {
-      const [savedMoments, savedSubType] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEYS.MOMENTS_BALANCE),
-        AsyncStorage.getItem(STORAGE_KEYS.SUBSCRIPTION_TYPE),
-      ]);
-
-      if (savedMoments) {
-        setMomentsBalance(parseInt(savedMoments, 10));
-      }
-
-      if (savedSubType) {
-        setSubscriptionTier(savedSubType as SubscriptionTier);
-      }
-    } catch (error) {
-      if (__DEV__) console.error('Error loading saved purchase data:', error);
-    }
-  };
-
-  const initializePurchases = async () => {
-    try {
-      setIsLoading(true);
-      // IAP only works in production builds, skip in dev/simulator
-      const connected = await purchaseService.connect();
-      if (connected) {
-        await refreshProducts();
-
-        // Check for active subscription
-        const activeSub = await purchaseService.checkActiveSubscription();
-        if (activeSub) {
-          const tier = activeSub.includes('premium') ? 'premium' : 'pro';
-          setSubscriptionTier(tier);
-          await AsyncStorage.setItem(STORAGE_KEYS.SUBSCRIPTION_TYPE, tier);
-        }
-      }
-    } catch (error) {
-      // Silently fail - IAP not available in simulator/Expo Go
-      if (__DEV__) console.log('IAP not available:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const refreshProducts = async () => {
-    try {
-      const [momentProducts, subProducts] = await Promise.all([
-        purchaseService.getMomentBundles(),
-        purchaseService.getSubscriptions(),
-      ]);
-
-      setProducts(momentProducts);
-      setSubscriptions(subProducts);
-    } catch (error) {
-      if (__DEV__) console.error('Error refreshing products:', error);
-    }
-  };
 
   const saveMomentsBalance = async (balance: number) => {
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.MOMENTS_BALANCE, balance.toString());
     } catch (error) {
-      if (__DEV__) console.error('Error saving moments balance:', error);
+      console.error('[PurchaseContext] Error saving moments balance:', error);
     }
   };
 
-  const purchaseMoments = useCallback(async (productId: string): Promise<PurchaseResult> => {
-    setIsLoading(true);
+  const refreshOfferings = useCallback(async () => {
     try {
-      const result = await purchaseService.purchaseProduct(productId);
-
-      if (result.success && result.moments) {
-        // Use functional update to avoid race conditions
-        setMomentsBalance(prev => {
-          const newBalance = prev + result.moments!;
-          saveMomentsBalance(newBalance);
-          return newBalance;
-        });
-      }
-
-      return result;
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    } finally {
-      setIsLoading(false);
+      const availableOfferings = await getOfferings();
+      setOfferings(availableOfferings);
+    } catch (error) {
+      console.error('[PurchaseContext] Error refreshing offerings:', error);
     }
   }, []);
 
-  const purchaseSubscription = useCallback(async (productId: string): Promise<PurchaseResult> => {
+  const checkProAccess = useCallback(async (): Promise<boolean> => {
+    try {
+      const hasAccess = await checkHavenProAccess();
+      setIsProUser(hasAccess);
+      return hasAccess;
+    } catch (error) {
+      console.error('[PurchaseContext] Error checking pro access:', error);
+      return false;
+    }
+  }, []);
+
+  const purchaseProduct = useCallback(async (pkg: PurchasesPackage): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
     try {
-      const result = await purchaseService.purchaseProduct(productId);
+      const result = await purchasePackage(pkg);
 
-      if (result.success) {
-        // Determine subscription tier
-        const tier: SubscriptionTier = productId.includes('premium') ? 'premium' : 'pro';
-        setSubscriptionTier(tier);
-        await AsyncStorage.setItem(STORAGE_KEYS.SUBSCRIPTION_TYPE, tier);
+      if (result.success && result.customerInfo) {
+        setCustomerInfo(result.customerInfo);
+        const hasAccess = result.customerInfo.entitlements.active[ENTITLEMENT_ID] !== undefined;
+        setIsProUser(hasAccess);
 
-        // Add monthly moments using functional update to avoid race conditions
-        const monthlyMoments = SUBSCRIPTION_MOMENTS[productId] || 0;
-        if (monthlyMoments > 0) {
+        // Add bonus moments for subscribers
+        if (hasAccess) {
+          const bonusMoments = 1000; // Bonus moments for becoming Pro
           setMomentsBalance(prev => {
-            const newBalance = prev + monthlyMoments;
+            const newBalance = prev + bonusMoments;
             saveMomentsBalance(newBalance);
             return newBalance;
           });
         }
       }
 
-      return result;
+      return {
+        success: result.success,
+        error: result.error,
+      };
     } catch (error: any) {
-      return { success: false, error: error.message };
+      return {
+        success: false,
+        error: error.message || 'Purchase failed',
+      };
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  const restorePurchases = useCallback(async () => {
+  const restorePurchases = useCallback(async (): Promise<{ success: boolean; hasProAccess: boolean; error?: string }> => {
     setIsLoading(true);
     try {
-      const purchases = await purchaseService.restorePurchases();
+      const result = await restoreRevenueCatPurchases();
 
-      // Check for active subscription
-      const subscriptionIds = [
-        PRODUCT_IDS.SUB_PRO_MONTHLY,
-        PRODUCT_IDS.SUB_PRO_QUARTERLY,
-        PRODUCT_IDS.SUB_PRO_ANNUAL,
-        PRODUCT_IDS.SUB_PREMIUM_MONTHLY,
-        PRODUCT_IDS.SUB_PREMIUM_QUARTERLY,
-        PRODUCT_IDS.SUB_PREMIUM_ANNUAL,
-      ];
-
-      const activeSub = purchases.find(p => subscriptionIds.includes(p.productId));
-
-      if (activeSub) {
-        const tier: SubscriptionTier = activeSub.productId.includes('premium') ? 'premium' : 'pro';
-        setSubscriptionTier(tier);
-        await AsyncStorage.setItem(STORAGE_KEYS.SUBSCRIPTION_TYPE, tier);
+      if (result.success && result.customerInfo) {
+        setCustomerInfo(result.customerInfo);
+        setIsProUser(result.hasProAccess);
       }
-    } catch (error) {
-      if (__DEV__) console.error('Error restoring purchases:', error);
+
+      return {
+        success: result.success,
+        hasProAccess: result.hasProAccess,
+        error: result.error,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        hasProAccess: false,
+        error: error.message || 'Restore failed',
+      };
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   const useMoments = useCallback(async (amount: number): Promise<boolean> => {
-    // Use a ref to track whether we successfully deducted
+    // Pro users have unlimited moments
+    if (isProUser) {
+      return true;
+    }
+
     let success = false;
 
     setMomentsBalance(prev => {
@@ -227,7 +225,7 @@ export const PurchaseProvider: React.FC<PurchaseProviderProps> = ({ children }) 
     });
 
     return success;
-  }, []);
+  }, [isProUser]);
 
   const addMoments = useCallback(async (amount: number) => {
     setMomentsBalance(prev => {
@@ -237,18 +235,64 @@ export const PurchaseProvider: React.FC<PurchaseProviderProps> = ({ children }) 
     });
   }, []);
 
+  // Track voice call usage - 100 moments per minute (free for Pro users)
+  const trackVoiceCallUsage = useCallback(async (durationSeconds: number): Promise<{ success: boolean; momentsUsed: number; newBalance: number }> => {
+    // Pro users get unlimited voice calls
+    if (isProUser) {
+      return { success: true, momentsUsed: 0, newBalance: momentsBalance };
+    }
+
+    const minutes = Math.ceil(durationSeconds / 60);
+    const momentsToDeduct = minutes * 100; // 100 moments per minute
+
+    return new Promise((resolve) => {
+      setMomentsBalance(prev => {
+        const newBalance = Math.max(0, prev - momentsToDeduct);
+        saveMomentsBalance(newBalance);
+        resolve({ success: true, momentsUsed: momentsToDeduct, newBalance });
+        return newBalance;
+      });
+    });
+  }, [isProUser, momentsBalance]);
+
+  // Track chat usage - 1 moment per response (free for Pro users)
+  const trackChatUsage = useCallback(async (): Promise<{ success: boolean; newBalance: number }> => {
+    // Pro users get unlimited chat
+    if (isProUser) {
+      return { success: true, newBalance: momentsBalance };
+    }
+
+    const momentsToDeduct = 1;
+
+    return new Promise((resolve) => {
+      setMomentsBalance(prev => {
+        if (prev < momentsToDeduct) {
+          resolve({ success: false, newBalance: prev });
+          return prev;
+        }
+
+        const newBalance = prev - momentsToDeduct;
+        saveMomentsBalance(newBalance);
+        resolve({ success: true, newBalance });
+        return newBalance;
+      });
+    });
+  }, [isProUser, momentsBalance]);
+
   const value: PurchaseContextType = {
     momentsBalance,
-    subscriptionTier,
+    isProUser,
     isLoading,
-    products,
-    subscriptions,
-    purchaseMoments,
-    purchaseSubscription,
+    offerings,
+    customerInfo,
+    purchaseProduct,
     restorePurchases,
     useMoments,
     addMoments,
-    refreshProducts,
+    refreshOfferings,
+    checkProAccess,
+    trackVoiceCallUsage,
+    trackChatUsage,
   };
 
   return (

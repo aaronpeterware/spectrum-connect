@@ -1,0 +1,67 @@
+{
+  "scenarioId": "audio_1_1",
+  "title": "The Coffee Shop Connection",
+  "segments": [
+    {
+      "index": 0,
+      "speaker": "Alex",
+      "filename": "segment_00.mp3",
+      "text": "Hey! Is this seat taken?"
+    },
+    {
+      "index": 1,
+      "speaker": "Jordan",
+      "filename": "segment_01.mp3",
+      "text": "Oh, no go ahead! It's all yours."
+    },
+    {
+      "index": 2,
+      "speaker": "Alex",
+      "filename": "segment_02.mp3",
+      "text": "Thanks! I'm Alex by the way. This place has the best lattes."
+    },
+    {
+      "index": 3,
+      "speaker": "Jordan",
+      "filename": "segment_03.mp3",
+      "text": "I'm Jordan! Yeah I come here all the time - what's your go-to order?"
+    },
+    {
+      "index": 4,
+      "speaker": "Alex",
+      "filename": "segment_04.mp3",
+      "text": "Oat milk latte with an extra shot. I'm kind of a coffee snob, honestly."
+    },
+    {
+      "index": 5,
+      "speaker": "Jordan",
+      "filename": "segment_05.mp3",
+      "text": "Ha! Same here. Have you tried the new seasonal one? I've been meaning to but I always chicken out and get my usual."
+    },
+    {
+      "index": 6,
+      "speaker": "Alex",
+      "filename": "segment_06.mp3",
+      "text": "I haven't but now I'm curious. Maybe I'll try it next time. Do you work nearby?"
+    },
+    {
+      "index": 7,
+      "speaker": "Jordan",
+      "filename": "segment_07.mp3",
+      "text": "Yeah, just around the corner actually. It's nice having this place so close. What about you - do you live around here?"
+    },
+    {
+      "index": 8,
+      "speaker": "Alex",
+      "filename": "segment_08.mp3",
+      "text": "About ten minutes away. Hey, I don't want to keep you if you're busy, but would you want to grab coffee together sometime? Like, intentionally?"
+    },
+    {
+      "index": 9,
+      "speaker": "Jordan",
+      "filename": "segment_09.mp3",
+      "text": "I'd really like that actually! Here, let me give you my number."
+    }
+  ],
+  "generatedAt": "2026-01-21T03:33:10.302Z"
+}

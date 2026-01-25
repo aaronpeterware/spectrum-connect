@@ -1,0 +1,53 @@
+{
+  "name": "@cli4ai/chrome",
+  "version": "1.1.4",
+  "description": "Chrome browser automation with managed browser instance",
+  "author": "cliforai",
+  "license": "BUSL-1.1",
+  "main": "dist/run.js",
+  "bin": {
+    "chrome": "./dist/run.js"
+  },
+  "type": "module",
+  "keywords": [
+    "cli4ai",
+    "cli",
+    "ai-tools",
+    "chrome",
+    "browser",
+    "puppeteer",
+    "automation",
+    "headless"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cliforai/packages",
+    "directory": "packages/chrome"
+  },
+  "homepage": "https://github.com/cliforai/packages/tree/main/packages/chrome",
+  "bugs": {
+    "url": "https://github.com/cliforai/packages/issues"
+  },
+  "dependencies": {
+    "@cli4ai/lib": "^1.0.9",
+    "commander": "^14.0.2",
+    "puppeteer": "^24.35.0"
+  },
+  "files": [
+    "dist",
+    "cli4ai.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.0.0"
+  }
+}

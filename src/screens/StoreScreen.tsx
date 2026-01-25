@@ -8,6 +8,7 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,131 +16,30 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import MenuModal from '../components/MenuModal';
+import Paywall from '../components/Paywall';
+import CustomerCenter from '../components/CustomerCenter';
 import { usePurchases } from '../context/PurchaseContext';
-import { PRODUCT_IDS } from '../services/PurchaseService';
+import { useTheme } from '../hooks/useTheme';
 
 const { width } = Dimensions.get('window');
-
-// Featured moment bundles (on sale) - linked to App Store product IDs
-const featuredBundles = [
-  {
-    id: 'starter',
-    productId: PRODUCT_IDS.MOMENTS_STARTER,
-    name: 'Starter Pack',
-    moments: 10000,
-    price: 19.99,
-    originalPrice: 24.99,
-    savings: 20,
-    icon: 'flash',
-    gradient: [Colors.gradientPink, Colors.gradientPurple] as const,
-  },
-  {
-    id: 'heart',
-    productId: PRODUCT_IDS.MOMENTS_HEART,
-    name: 'Heart to Heart',
-    moments: 22000,
-    price: 39.99,
-    originalPrice: 56.99,
-    savings: 30,
-    icon: 'heart',
-    gradient: [Colors.gradientPurple, Colors.gradientBlue] as const,
-  },
-  {
-    id: 'deep',
-    productId: PRODUCT_IDS.MOMENTS_DEEP,
-    name: 'Deep Dive',
-    moments: 45000,
-    price: 74.99,
-    originalPrice: 124.99,
-    savings: 40,
-    icon: 'water',
-    gradient: [Colors.gradientBlue, Colors.gradientMint] as const,
-  },
-  {
-    id: 'unlimited',
-    productId: PRODUCT_IDS.MOMENTS_UNLIMITED,
-    name: 'Unlimited',
-    moments: 200000,
-    price: 249.99,
-    originalPrice: 499.99,
-    savings: 50,
-    icon: 'infinite',
-    gradient: ['#FFD700', '#FFA500'] as const,
-    featured: true,
-  },
-];
-
-// Standard moment bundles - linked to App Store product IDs
-const standardBundles = [
-  {
-    id: 'quick',
-    productId: PRODUCT_IDS.MOMENTS_QUICK,
-    name: 'Quick Chat',
-    moments: 1800,
-    price: 5.99,
-    icon: 'chatbubble',
-  },
-  {
-    id: 'chat',
-    productId: PRODUCT_IDS.MOMENTS_CHAT,
-    name: 'Chat Pack',
-    moments: 4000,
-    price: 11.99,
-    icon: 'chatbubbles',
-  },
-];
-
-// Subscription plans - linked to App Store product IDs
-const subscriptionPlans = [
-  {
-    id: 'pro',
-    productId: PRODUCT_IDS.SUB_PRO_MONTHLY,
-    name: 'Pro',
-    price: 14.99,
-    period: 'month',
-    tier: 'pro' as const,
-    features: [
-      'Community access',
-      'Dating tips & advice',
-      'All courses included',
-      '100 responses/day',
-      '1,000 moments/month',
-      'Voice calls',
-    ],
-  },
-  {
-    id: 'premium',
-    productId: PRODUCT_IDS.SUB_PREMIUM_MONTHLY,
-    name: 'Premium',
-    price: 29.99,
-    period: 'month',
-    tier: 'premium' as const,
-    features: [
-      'Everything in Pro',
-      'Unlimited messaging',
-      'Priority voice calls',
-      '8,000 moments/month',
-      'Exclusive companions',
-      'Priority support',
-    ],
-    recommended: true,
-  },
-];
 
 type TabType = 'moments' | 'subscribe';
 
 const StoreScreen = () => {
+  const { colors, isDark } = useTheme();
   const navigation = useNavigation();
   const [menuVisible, setMenuVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabType>('moments');
+  const [activeTab, setActiveTab] = useState<TabType>('subscribe');
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [showCustomerCenter, setShowCustomerCenter] = useState(false);
 
   const {
     momentsBalance,
-    subscriptionTier,
+    isProUser,
     isLoading,
-    purchaseMoments,
-    purchaseSubscription,
+    offerings,
+    purchaseProduct,
     restorePurchases,
   } = usePurchases();
 
@@ -147,51 +47,15 @@ const StoreScreen = () => {
     return num.toLocaleString();
   };
 
-  const handlePurchaseMoments = async (productId: string, bundleName: string) => {
-    setIsPurchasing(true);
-    try {
-      const result = await purchaseMoments(productId);
-      if (result.success) {
-        Alert.alert(
-          'Purchase Successful!',
-          `You've added ${formatNumber(result.moments || 0)} moments to your balance.`,
-          [{ text: 'OK' }]
-        );
-      } else if (result.error !== 'Purchase cancelled') {
-        Alert.alert('Purchase Failed', result.error || 'Something went wrong. Please try again.');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
-    } finally {
-      setIsPurchasing(false);
-    }
-  };
-
-  const handlePurchaseSubscription = async (productId: string, planName: string) => {
-    setIsPurchasing(true);
-    try {
-      const result = await purchaseSubscription(productId);
-      if (result.success) {
-        Alert.alert(
-          'Subscription Activated!',
-          `Welcome to ${planName}! Your subscription is now active.`,
-          [{ text: 'OK' }]
-        );
-      } else if (result.error !== 'Purchase cancelled') {
-        Alert.alert('Subscription Failed', result.error || 'Something went wrong. Please try again.');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
-    } finally {
-      setIsPurchasing(false);
-    }
-  };
-
   const handleRestorePurchases = async () => {
     setIsPurchasing(true);
     try {
-      await restorePurchases();
-      Alert.alert('Restore Complete', 'Your purchases have been restored.');
+      const result = await restorePurchases();
+      if (result.hasProAccess) {
+        Alert.alert('Restore Complete', 'Your Haven Pro subscription has been restored.');
+      } else {
+        Alert.alert('No Purchases Found', 'We couldn\'t find any previous purchases to restore.');
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to restore purchases. Please try again.');
     } finally {
@@ -201,201 +65,227 @@ const StoreScreen = () => {
 
   const renderMomentsTab = () => (
     <>
-      {/* Featured Bundles */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Featured</Text>
-          <View style={styles.saleBadge}>
-            <Text style={styles.saleBadgeText}>SALE</Text>
-          </View>
-        </View>
-
-        <View style={styles.bundlesGrid}>
-          {featuredBundles.map((bundle) => (
-            <TouchableOpacity
-              key={bundle.id}
-              style={[styles.bundleCard, bundle.featured && styles.bundleCardFeatured]}
-              onPress={() => handlePurchaseMoments(bundle.productId, bundle.name)}
-              disabled={isPurchasing}
-            >
-              {bundle.featured && (
-                <View style={styles.megaBadge}>
-                  <Text style={styles.megaBadgeText}>MEGA</Text>
-                </View>
-              )}
-              <LinearGradient
-                colors={bundle.gradient}
-                style={styles.bundleIcon}
-              >
-                <Ionicons name={bundle.icon as any} size={24} color="white" />
-              </LinearGradient>
-              <Text style={styles.bundleName}>{bundle.name}</Text>
-              <Text style={styles.bundleMoments}>{formatNumber(bundle.moments)} moments</Text>
-              <View style={styles.priceContainer}>
-                <Text style={styles.bundlePrice}>${bundle.price}</Text>
-                {bundle.originalPrice && (
-                  <Text style={styles.originalPrice}>${bundle.originalPrice}</Text>
-                )}
+      {/* Pro Benefits Card */}
+      {!isProUser && (
+        <TouchableOpacity
+          style={styles.proBenefitsCard}
+          onPress={() => setShowPaywall(true)}
+        >
+          <LinearGradient
+            colors={[Colors.gradientPink, Colors.gradientPurple]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.proBenefitsGradient}
+          >
+            <View style={styles.proBenefitsContent}>
+              <View style={styles.proBenefitsIcon}>
+                <Ionicons name="star" size={24} color="white" />
               </View>
-              <View style={styles.savingsBadge}>
-                <Text style={styles.savingsText}>Save {bundle.savings}%</Text>
+              <View style={styles.proBenefitsText}>
+                <Text style={styles.proBenefitsTitle}>Upgrade to Haven Pro</Text>
+                <Text style={styles.proBenefitsSubtitle}>
+                  Unlimited calls, messages, and more
+                </Text>
               </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Standard Bundles */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Standard</Text>
-
-        <View style={styles.standardBundles}>
-          {standardBundles.map((bundle) => (
-            <TouchableOpacity
-              key={bundle.id}
-              style={styles.standardBundleCard}
-              onPress={() => handlePurchaseMoments(bundle.productId, bundle.name)}
-              disabled={isPurchasing}
-            >
-              <View style={styles.standardBundleLeft}>
-                <View style={styles.standardBundleIcon}>
-                  <Ionicons name={bundle.icon as any} size={20} color={Colors.primary} />
-                </View>
-                <View>
-                  <Text style={styles.standardBundleName}>{bundle.name}</Text>
-                  <Text style={styles.standardBundleMoments}>{formatNumber(bundle.moments)} moments</Text>
-                </View>
-              </View>
-              <View style={styles.standardBundleRight}>
-                <Text style={styles.standardBundlePrice}>${bundle.price}</Text>
-                <Ionicons name="chevron-forward" size={20} color={Colors.gray400} />
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
+              <Ionicons name="chevron-forward" size={24} color="white" />
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
 
       {/* Info Card */}
-      <View style={styles.infoCard}>
+      <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
         <Ionicons name="information-circle" size={24} color={Colors.primary} />
         <View style={styles.infoContent}>
-          <Text style={styles.infoTitle}>What are moments?</Text>
-          <Text style={styles.infoText}>
-            Moments are used for AI companion conversations. Voice calls use 100 moments per minute.
+          <Text style={[styles.infoTitle, { color: colors.text }]}>About Moments</Text>
+          <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+            Moments are used for AI companion conversations. Voice calls use 100 moments per minute, chat uses 1 moment per message.
+            {isProUser ? ' As a Haven Pro member, you have unlimited moments!' : ''}
           </Text>
+        </View>
+      </View>
+
+      {/* Usage Stats */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Usage</Text>
+        <View style={[styles.usageCard, { backgroundColor: colors.cardBackground }]}>
+          <View style={styles.usageRow}>
+            <View style={styles.usageItem}>
+              <View style={[styles.usageIcon, { backgroundColor: `${Colors.primary}15` }]}>
+                <Ionicons name="call" size={20} color={Colors.primary} />
+              </View>
+              <Text style={[styles.usageLabel, { color: colors.textSecondary }]}>Voice Calls</Text>
+              <Text style={[styles.usageValue, { color: colors.text }]}>
+                {isProUser ? 'Unlimited' : '100/min'}
+              </Text>
+            </View>
+            <View style={styles.usageItem}>
+              <View style={[styles.usageIcon, { backgroundColor: `${Colors.primary}15` }]}>
+                <Ionicons name="chatbubble" size={20} color={Colors.primary} />
+              </View>
+              <Text style={[styles.usageLabel, { color: colors.textSecondary }]}>Chat</Text>
+              <Text style={[styles.usageValue, { color: colors.text }]}>
+                {isProUser ? 'Unlimited' : '1/msg'}
+              </Text>
+            </View>
+          </View>
         </View>
       </View>
     </>
   );
 
   const renderSubscribeTab = () => {
+    if (isProUser) {
+      return (
+        <View style={styles.section}>
+          {/* Pro Status Card */}
+          <View style={[styles.proStatusCard, { backgroundColor: colors.cardBackground }]}>
+            <LinearGradient
+              colors={[Colors.gradientPink, Colors.gradientPurple]}
+              style={styles.proStatusIcon}
+            >
+              <Ionicons name="checkmark" size={32} color="white" />
+            </LinearGradient>
+            <Text style={[styles.proStatusTitle, { color: colors.text }]}>
+              You're a Haven Pro member!
+            </Text>
+            <Text style={[styles.proStatusSubtitle, { color: colors.textSecondary }]}>
+              Enjoy unlimited access to all Haven features.
+            </Text>
+            <TouchableOpacity
+              style={styles.manageButton}
+              onPress={() => setShowCustomerCenter(true)}
+            >
+              <Text style={styles.manageButtonText}>Manage Subscription</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Pro Features */}
+          <Text style={[styles.sectionTitle, { color: colors.text, marginTop: Spacing.xl }]}>
+            Your Benefits
+          </Text>
+          <View style={[styles.featuresCard, { backgroundColor: colors.cardBackground }]}>
+            <FeatureItem icon="infinite" title="Unlimited Voice Calls" colors={colors} />
+            <FeatureItem icon="chatbubbles" title="Unlimited Chat Messages" colors={colors} />
+            <FeatureItem icon="people" title="All 20 AI Companions" colors={colors} />
+            <FeatureItem icon="sparkles" title="Priority Features" colors={colors} />
+          </View>
+        </View>
+      );
+    }
+
     return (
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Choose Your Plan</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Choose Your Plan</Text>
 
-        <View style={styles.subscriptionContainer}>
-          {subscriptionPlans.map((sub) => {
-            const isCurrentPlan = subscriptionTier === sub.tier;
-            return (
-              <View
-                key={sub.id}
-                style={[
-                  styles.subscriptionCard,
-                  sub.recommended && styles.subscriptionCardRecommended,
-                  isCurrentPlan && styles.subscriptionCardCurrent,
-                ]}
-              >
-                {sub.recommended && !isCurrentPlan && (
-                  <LinearGradient
-                    colors={[Colors.gradientPurple, Colors.gradientBlue]}
-                    style={styles.recommendedBadge}
-                  >
-                    <Text style={styles.recommendedText}>BEST VALUE</Text>
-                  </LinearGradient>
-                )}
-                {isCurrentPlan && (
-                  <View style={styles.currentBadge}>
-                    <Text style={styles.currentBadgeText}>CURRENT PLAN</Text>
-                  </View>
-                )}
+        {/* Plans from RevenueCat */}
+        {offerings?.current?.availablePackages.map((pkg) => {
+          const isYearly = pkg.packageType === 'ANNUAL';
+          const isLifetime = pkg.packageType === 'LIFETIME';
 
-                <Text style={styles.subName}>{sub.name}</Text>
-                <View style={styles.priceRow}>
-                  <Text style={styles.subPrice}>${sub.price}</Text>
-                  <Text style={styles.subPeriod}>/{sub.period}</Text>
+          return (
+            <TouchableOpacity
+              key={pkg.identifier}
+              style={[
+                styles.planCard,
+                { backgroundColor: colors.cardBackground },
+                isYearly && styles.planCardRecommended,
+              ]}
+              onPress={() => setShowPaywall(true)}
+            >
+              {isYearly && (
+                <View style={styles.recommendedBadge}>
+                  <Text style={styles.recommendedText}>BEST VALUE</Text>
                 </View>
-
-                <View style={styles.featuresList}>
-                  {sub.features.map((feature, index) => (
-                    <View key={index} style={styles.featureRow}>
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={18}
-                        color={sub.recommended ? Colors.primary : Colors.success}
-                      />
-                      <Text style={styles.featureText}>{feature}</Text>
-                    </View>
-                  ))}
+              )}
+              {isLifetime && (
+                <View style={[styles.recommendedBadge, { backgroundColor: '#FFD700' }]}>
+                  <Text style={[styles.recommendedText, { color: '#000' }]}>LIFETIME</Text>
                 </View>
-
-                <TouchableOpacity
-                  style={[
-                    styles.subscribeButton,
-                    sub.recommended && styles.subscribeButtonPrimary,
-                    isCurrentPlan && styles.subscribeButtonDisabled,
-                  ]}
-                  disabled={isCurrentPlan || isPurchasing}
-                  onPress={() => handlePurchaseSubscription(sub.productId, sub.name)}
-                >
-                  <Text
-                    style={[
-                      styles.subscribeButtonText,
-                      sub.recommended && styles.subscribeButtonTextPrimary,
-                    ]}
-                  >
-                    {isCurrentPlan ? 'Current Plan' : 'Subscribe'}
-                  </Text>
-                </TouchableOpacity>
+              )}
+              <View style={styles.planHeader}>
+                <Text style={[styles.planTitle, { color: colors.text }]}>
+                  {pkg.product.title || 'Haven Pro'}
+                </Text>
+                <Text style={[styles.planPrice, { color: Colors.primary }]}>
+                  {pkg.product.priceString}
+                </Text>
               </View>
-            );
-          })}
-        </View>
+              <Text style={[styles.planDescription, { color: colors.textSecondary }]}>
+                {pkg.product.description || 'Unlimited access to all features'}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
 
-        {/* Restore Purchases Button */}
+        {/* CTA Button */}
+        <TouchableOpacity
+          style={styles.ctaButton}
+          onPress={() => setShowPaywall(true)}
+        >
+          <LinearGradient
+            colors={[Colors.gradientPink, Colors.gradientPurple]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.ctaButtonGradient}
+          >
+            <Text style={styles.ctaButtonText}>View All Plans</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* Restore Purchases */}
         <TouchableOpacity
           style={styles.restoreButton}
           onPress={handleRestorePurchases}
           disabled={isPurchasing}
         >
-          <Text style={styles.restoreButtonText}>Restore Purchases</Text>
+          {isPurchasing ? (
+            <ActivityIndicator size="small" color={Colors.primary} />
+          ) : (
+            <Text style={styles.restoreButtonText}>Restore Purchases</Text>
+          )}
         </TouchableOpacity>
-
-        {/* Billing Info */}
-        <View style={styles.billingInfo}>
-          <Text style={styles.billingTitle}>Billing Options</Text>
-          <Text style={styles.billingText}>
-            Save up to 33% with annual billing. Cancel anytime.
-          </Text>
-        </View>
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <MenuModal visible={menuVisible} onClose={() => setMenuVisible(false)} />
+
+      {/* Paywall Modal */}
+      <Modal
+        visible={showPaywall}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <Paywall
+          onClose={() => setShowPaywall(false)}
+          onPurchaseComplete={() => setShowPaywall(false)}
+        />
+      </Modal>
+
+      {/* Customer Center Modal */}
+      <Modal
+        visible={showCustomerCenter}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+          <CustomerCenter onClose={() => setShowCustomerCenter(false)} />
+        </SafeAreaView>
+      </Modal>
 
       {/* Header Bar */}
       <View style={styles.headerBar}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.gray900} />
+        <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.cardBackground }]} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.logoContainer}>
-          <Text style={styles.logoTextSpectrum}>Spectrum</Text>
-          <Text style={styles.logoTextConnect}>Connect</Text>
+          <Text style={[styles.logoTextSpectrum, { color: colors.text }]}>Haven</Text>
         </View>
-        <TouchableOpacity style={styles.menuButton} onPress={() => setMenuVisible(true)}>
-          <Ionicons name="menu" size={24} color={Colors.gray900} />
+        <TouchableOpacity style={[styles.menuButton, { backgroundColor: colors.cardBackground }]} onPress={() => setMenuVisible(true)}>
+          <Ionicons name="menu" size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -409,10 +299,18 @@ const StoreScreen = () => {
         >
           <View style={styles.balanceLeft}>
             <Text style={styles.balanceLabel}>Your Balance</Text>
-            <Text style={styles.balanceAmount}>{formatNumber(momentsBalance)} moments</Text>
+            <Text style={styles.balanceAmount}>
+              {isProUser ? 'Unlimited' : `${formatNumber(momentsBalance)} moments`}
+            </Text>
+            {isProUser && (
+              <View style={styles.proBadge}>
+                <Ionicons name="star" size={12} color="white" />
+                <Text style={styles.proBadgeText}>PRO</Text>
+              </View>
+            )}
           </View>
           <View style={styles.balanceIcon}>
-            <Ionicons name="wallet" size={32} color="white" />
+            <Ionicons name={isProUser ? 'infinite' : 'wallet'} size={32} color="white" />
           </View>
         </LinearGradient>
       </View>
@@ -420,29 +318,29 @@ const StoreScreen = () => {
       {/* Tabs */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'moments' && styles.tabActive]}
+          style={[styles.tab, { backgroundColor: colors.cardBackground }, activeTab === 'moments' && styles.tabActive]}
           onPress={() => setActiveTab('moments')}
         >
           <Ionicons
             name="chatbubbles"
             size={18}
-            color={activeTab === 'moments' ? Colors.primary : Colors.gray500}
+            color={activeTab === 'moments' ? Colors.primary : colors.textSecondary}
           />
-          <Text style={[styles.tabText, activeTab === 'moments' && styles.tabTextActive]}>
+          <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'moments' && styles.tabTextActive]}>
             Moments
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'subscribe' && styles.tabActive]}
+          style={[styles.tab, { backgroundColor: colors.cardBackground }, activeTab === 'subscribe' && styles.tabActive]}
           onPress={() => setActiveTab('subscribe')}
         >
           <Ionicons
             name="star"
             size={18}
-            color={activeTab === 'subscribe' ? Colors.primary : Colors.gray500}
+            color={activeTab === 'subscribe' ? Colors.primary : colors.textSecondary}
           />
-          <Text style={[styles.tabText, activeTab === 'subscribe' && styles.tabTextActive]}>
-            Subscribe
+          <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'subscribe' && styles.tabTextActive]}>
+            Haven Pro
           </Text>
         </TouchableOpacity>
       </View>
@@ -454,17 +352,31 @@ const StoreScreen = () => {
       </ScrollView>
 
       {/* Loading Overlay */}
-      {isPurchasing && (
+      {(isPurchasing || isLoading) && (
         <View style={styles.loadingOverlay}>
-          <View style={styles.loadingContainer}>
+          <View style={[styles.loadingContainer, { backgroundColor: colors.cardBackground }]}>
             <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={styles.loadingText}>Processing...</Text>
+            <Text style={[styles.loadingText, { color: colors.text }]}>Processing...</Text>
           </View>
         </View>
       )}
     </SafeAreaView>
   );
 };
+
+interface FeatureItemProps {
+  icon: string;
+  title: string;
+  colors: any;
+}
+
+const FeatureItem: React.FC<FeatureItemProps> = ({ icon, title, colors }) => (
+  <View style={styles.featureItem}>
+    <Ionicons name={icon as any} size={20} color={Colors.primary} />
+    <Text style={[styles.featureText, { color: colors.text }]}>{title}</Text>
+    <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+  </View>
+);
 
 const styles = StyleSheet.create({
   container: {
@@ -496,12 +408,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.gray900,
   },
-  logoTextConnect: {
-    fontSize: 18,
-    fontWeight: '300',
-    color: Colors.primary,
-    fontStyle: 'italic',
-  },
   menuButton: {
     width: 40,
     height: 40,
@@ -531,6 +437,21 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: 'white',
+  },
+  proBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    marginTop: Spacing.xs,
+    gap: 4,
+  },
+  proBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '700',
   },
   balanceIcon: {
     width: 56,
@@ -570,170 +491,56 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
   },
   section: {
-    paddingHorizontal: Spacing.lg,
     marginBottom: Spacing.xl,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
   },
   sectionTitle: {
     ...Typography.h3,
     color: Colors.gray900,
-  },
-  saleBadge: {
-    backgroundColor: Colors.error,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
-  },
-  saleBadgeText: {
-    ...Typography.caption,
-    color: 'white',
-    fontWeight: '700',
-    fontSize: 10,
-  },
-  bundlesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.md,
-  },
-  bundleCard: {
-    width: (width - Spacing.lg * 2 - Spacing.md) / 2,
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
-    shadowColor: Colors.gray900,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  bundleCardFeatured: {
-    borderWidth: 2,
-    borderColor: '#FFD700',
-  },
-  megaBadge: {
-    position: 'absolute',
-    top: -10,
-    right: Spacing.md,
-    backgroundColor: '#FFD700',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
-  },
-  megaBadgeText: {
-    ...Typography.caption,
-    color: '#000',
-    fontWeight: '700',
-    fontSize: 10,
-  },
-  bundleIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: Spacing.md,
   },
-  bundleName: {
-    ...Typography.body,
-    fontWeight: '600',
-    color: Colors.gray900,
+  proBenefitsCard: {
+    marginBottom: Spacing.lg,
+    borderRadius: BorderRadius.xl,
+    overflow: 'hidden',
   },
-  bundleMoments: {
-    ...Typography.caption,
-    color: Colors.gray500,
-    marginTop: 2,
+  proBenefitsGradient: {
+    padding: Spacing.lg,
   },
-  priceContainer: {
+  proBenefitsContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
-    marginTop: Spacing.sm,
   },
-  bundlePrice: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  originalPrice: {
-    ...Typography.caption,
-    color: Colors.gray400,
-    textDecorationLine: 'line-through',
-  },
-  savingsBadge: {
-    backgroundColor: `${Colors.success}15`,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
-    alignSelf: 'flex-start',
-    marginTop: Spacing.xs,
-  },
-  savingsText: {
-    ...Typography.caption,
-    color: Colors.success,
-    fontWeight: '600',
-    fontSize: 11,
-  },
-  standardBundles: {
-    gap: Spacing.sm,
-  },
-  standardBundleCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    shadowColor: Colors.gray900,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  standardBundleLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  standardBundleIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: `${Colors.primary}15`,
+  proBenefitsIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: Spacing.md,
   },
-  standardBundleName: {
-    ...Typography.body,
-    fontWeight: '600',
-    color: Colors.gray900,
+  proBenefitsText: {
+    flex: 1,
   },
-  standardBundleMoments: {
-    ...Typography.caption,
-    color: Colors.gray500,
-  },
-  standardBundleRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  standardBundlePrice: {
+  proBenefitsTitle: {
     ...Typography.body,
     fontWeight: '700',
-    color: Colors.primary,
+    color: 'white',
+  },
+  proBenefitsSubtitle: {
+    ...Typography.caption,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
   },
   infoCard: {
     flexDirection: 'row',
-    backgroundColor: `${Colors.primary}10`,
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
-    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
     gap: Spacing.md,
   },
   infoContent: {
@@ -750,133 +557,144 @@ const styles = StyleSheet.create({
     color: Colors.gray600,
     lineHeight: 20,
   },
-  subscriptionContainer: {
-    gap: Spacing.lg,
-  },
-  subscriptionCard: {
+  usageCard: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
-    borderWidth: 2,
-    borderColor: Colors.gray200,
-    shadowColor: Colors.gray900,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
   },
-  subscriptionCardRecommended: {
-    borderColor: Colors.primary,
+  usageRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
   },
-  subscriptionCardCurrent: {
-    borderColor: Colors.success,
-    backgroundColor: `${Colors.success}08`,
+  usageItem: {
+    alignItems: 'center',
   },
-  recommendedBadge: {
-    position: 'absolute',
-    top: -12,
-    left: '50%',
-    transform: [{ translateX: -50 }],
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.full,
+  usageIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.sm,
   },
-  recommendedText: {
+  usageLabel: {
     ...Typography.caption,
-    color: 'white',
+    marginBottom: 2,
+  },
+  usageValue: {
+    ...Typography.body,
     fontWeight: '700',
-    fontSize: 11,
   },
-  currentBadge: {
-    position: 'absolute',
-    top: -10,
-    left: '50%',
-    transform: [{ translateX: -55 }],
-    backgroundColor: Colors.gray500,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.full,
+  proStatusCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    alignItems: 'center',
   },
-  currentBadgeText: {
-    ...Typography.caption,
+  proStatusIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.md,
+  },
+  proStatusTitle: {
+    ...Typography.h2,
+    textAlign: 'center',
+    marginBottom: Spacing.xs,
+  },
+  proStatusSubtitle: {
+    ...Typography.body,
+    textAlign: 'center',
+    marginBottom: Spacing.lg,
+  },
+  manageButton: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.lg,
+  },
+  manageButtonText: {
+    ...Typography.body,
     color: 'white',
     fontWeight: '600',
-    fontSize: 10,
   },
-  subName: {
-    ...Typography.h3,
-    color: Colors.gray900,
-    marginTop: Spacing.sm,
+  featuresCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
   },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginTop: Spacing.xs,
-  },
-  subPrice: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: Colors.gray900,
-  },
-  subPeriod: {
-    ...Typography.body,
-    color: Colors.gray500,
-    marginLeft: 4,
-  },
-  featuresList: {
-    marginTop: Spacing.lg,
-    gap: Spacing.sm,
-  },
-  featureRow: {
+  featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    gap: Spacing.md,
   },
   featureText: {
     ...Typography.body,
-    color: Colors.gray700,
+    flex: 1,
   },
-  subscribeButton: {
-    marginTop: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    alignItems: 'center',
-    backgroundColor: Colors.gray100,
-  },
-  subscribeButtonPrimary: {
-    backgroundColor: Colors.primary,
-  },
-  subscribeButtonDisabled: {
-    backgroundColor: Colors.gray200,
-  },
-  subscribeButtonText: {
-    ...Typography.body,
-    fontWeight: '600',
-    color: Colors.gray700,
-  },
-  subscribeButtonTextPrimary: {
-    color: 'white',
-  },
-  billingInfo: {
+  planCard: {
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
-    marginTop: Spacing.lg,
+    marginBottom: Spacing.md,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
-  billingTitle: {
+  planCardRecommended: {
+    borderColor: Colors.primary,
+  },
+  recommendedBadge: {
+    position: 'absolute',
+    top: -10,
+    right: Spacing.md,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.sm,
+  },
+  recommendedText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  planHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  planTitle: {
     ...Typography.body,
-    fontWeight: '600',
-    color: Colors.gray900,
-    marginBottom: 4,
+    fontWeight: '700',
   },
-  billingText: {
+  planPrice: {
+    ...Typography.h3,
+    fontWeight: '700',
+  },
+  planDescription: {
     ...Typography.bodySmall,
-    color: Colors.gray500,
+  },
+  ctaButton: {
+    marginTop: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+  },
+  ctaButtonGradient: {
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+  },
+  ctaButtonText: {
+    ...Typography.body,
+    color: 'white',
+    fontWeight: '700',
   },
   restoreButton: {
     alignItems: 'center',
     paddingVertical: Spacing.md,
-    marginTop: Spacing.lg,
+    marginTop: Spacing.md,
   },
   restoreButtonText: {
     ...Typography.body,

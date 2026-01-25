@@ -636,14 +636,15 @@ export const AUDIO_MODULES: AudioModule[] = [
         skillsFocused: ['Tone recognition', 'Enthusiasm levels', 'Genuine vs. polite'],
         conversation: [
           {
-            speaker: 'Friend A',
+            speaker: 'Chris',
             voiceId: VOICES.josh,
             text: "Hey, want to come to my birthday party next Saturday?",
             emotion: 'hopeful',
+            bodyLanguage: 'Smiling, making eye contact',
             timestamp: 0
           },
           {
-            speaker: 'Friend B - Enthusiastic',
+            speaker: 'Maya',
             voiceId: VOICES.bella,
             text: "Oh my gosh, yes! I wouldn't miss it. What time should I be there? Can I bring anything?",
             emotion: 'genuinely excited',
@@ -651,21 +652,23 @@ export const AUDIO_MODULES: AudioModule[] = [
             timestamp: 4
           },
           {
-            speaker: 'Narrator',
-            voiceId: VOICES.rachel,
-            text: "Now listen to the same question with a different response.",
-            emotion: 'neutral',
-            timestamp: 12
+            speaker: 'Chris',
+            voiceId: VOICES.josh,
+            text: "Amazing! It starts at 7. You don't need to bring anything.",
+            emotion: 'happy',
+            bodyLanguage: 'Beaming smile',
+            timestamp: 10
           },
           {
-            speaker: 'Friend A',
+            speaker: 'Chris',
             voiceId: VOICES.josh,
-            text: "Hey, want to come to my birthday party next Saturday?",
+            text: "Hey Sophie, want to come to my birthday party next Saturday?",
             emotion: 'hopeful',
+            bodyLanguage: 'Same friendly approach',
             timestamp: 16
           },
           {
-            speaker: 'Friend B - Polite',
+            speaker: 'Sophie',
             voiceId: VOICES.elli,
             text: "Oh, um, yeah sure, I'll try to make it. What time is it?",
             emotion: 'hesitant',
@@ -673,11 +676,12 @@ export const AUDIO_MODULES: AudioModule[] = [
             timestamp: 20
           },
           {
-            speaker: 'Narrator',
-            voiceId: VOICES.rachel,
-            text: "Notice the difference? Let's break it down.",
-            emotion: 'instructive',
-            timestamp: 28
+            speaker: 'Chris',
+            voiceId: VOICES.josh,
+            text: "It's at 7. No pressure if you're busy though.",
+            emotion: 'understanding',
+            bodyLanguage: 'Gives an easy out',
+            timestamp: 26
           }
         ],
         socialCues: [
@@ -686,7 +690,7 @@ export const AUDIO_MODULES: AudioModule[] = [
             timestamp: 4,
             type: 'positive',
             category: 'tone',
-            description: 'Immediate enthusiastic response with exclamation and multiple questions',
+            description: 'Maya responds immediately with enthusiasm and multiple follow-up questions',
             significance: 'Genuine excitement comes fast, uses emphatic language, and asks for details to commit'
           },
           {
@@ -694,19 +698,19 @@ export const AUDIO_MODULES: AudioModule[] = [
             timestamp: 20,
             type: 'neutral',
             category: 'tone',
-            description: 'Hesitation ("um"), hedging language ("I\'ll try"), single basic question',
+            description: 'Sophie hesitates ("um"), hedges ("I\'ll try"), asks only one basic question',
             significance: 'Polite agreement often has pauses, non-committal words, and minimal follow-up'
           }
         ],
         questions: [
           {
             id: 'q_2_1_1',
-            question: 'What made the first response clearly enthusiastic?',
+            question: 'What made Maya\'s response clearly enthusiastic?',
             options: [
-              'They said "yes"',
+              'She said "yes"',
               'Immediate response, excited tone, and multiple follow-up questions',
-              'They spoke loudly',
-              'They made a promise'
+              'She spoke loudly',
+              'She made a promise'
             ],
             correctIndex: 1,
             explanation: 'Genuine enthusiasm shows through speed of response, excited tone, and asking multiple questions that show they\'re already planning to come.',
@@ -715,7 +719,7 @@ export const AUDIO_MODULES: AudioModule[] = [
           },
           {
             id: 'q_2_1_2',
-            question: 'What words in the second response signaled hesitation?',
+            question: 'What words in Sophie\'s response signaled hesitation?',
             options: [
               '"Saturday" and "time"',
               '"um," "sure," and "I\'ll try"',
@@ -729,12 +733,12 @@ export const AUDIO_MODULES: AudioModule[] = [
           },
           {
             id: 'q_2_1_3',
-            question: 'If someone gives you a "polite yes," what should you do?',
+            question: 'How did Chris handle Sophie\'s hesitation well?',
             options: [
-              'Pressure them to commit',
-              'Accept they\'re excited and stop asking questions',
-              'Give them an easy out: "No pressure if you\'re busy"',
-              'Ask them why they don\'t want to come'
+              'He pressured her to commit',
+              'He ignored her hesitation',
+              'He gave her an easy out: "No pressure if you\'re busy"',
+              'He asked why she didn\'t want to come'
             ],
             correctIndex: 2,
             explanation: 'Giving someone an easy out respects their hesitation and lets them decline gracefully if needed. They might actually come, or they\'ll appreciate not being pressured.',

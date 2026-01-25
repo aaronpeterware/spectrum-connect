@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Haven - Connection Made Comfortable</title>
+    <meta name="description" content="Haven is a dating and friendship app designed for neurodivergent individuals. Practice conversations, build confidence, and find meaningful connections.">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1A1A2E 0%, #16213E 50%, #0F3460 100%);
+            min-height: 100vh;
+            color: #fff;
+            line-height: 1.6;
+        }
+        .hero {
+            text-align: center;
+            padding: 80px 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .logo {
+            font-size: 64px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 16px;
+        }
+        .tagline {
+            font-size: 24px;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 24px;
+        }
+        .subtitle {
+            font-size: 18px;
+            color: rgba(255,255,255,0.7);
+            max-width: 600px;
+            margin: 0 auto 40px;
+        }
+        .app-store-btn {
+            display: inline-block;
+            transition: transform 0.2s;
+        }
+        .app-store-btn:hover {
+            transform: scale(1.05);
+        }
+        .app-store-btn img {
+            height: 54px;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        .feature-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 32px;
+            backdrop-filter: blur(10px);
+            text-align: center;
+        }
+        .feature-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        .feature-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #667eea;
+        }
+        .feature-desc {
+            color: rgba(255,255,255,0.8);
+            font-size: 15px;
+        }
+        .section {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 60px 20px;
+            text-align: center;
+        }
+        .section-title {
+            font-size: 36px;
+            margin-bottom: 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .section-text {
+            color: rgba(255,255,255,0.85);
+            font-size: 18px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .testimonial {
+            background: rgba(255,255,255,0.08);
+            border-radius: 20px;
+            padding: 32px;
+            margin: 40px auto;
+            max-width: 600px;
+            font-style: italic;
+            color: rgba(255,255,255,0.9);
+        }
+        .testimonial-author {
+            margin-top: 16px;
+            font-style: normal;
+            color: #667eea;
+            font-weight: 600;
+        }
+        .cta {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+            padding: 60px 20px;
+            text-align: center;
+            margin-top: 40px;
+        }
+        .cta h2 {
+            font-size: 32px;
+            margin-bottom: 16px;
+        }
+        .cta p {
+            color: rgba(255,255,255,0.8);
+            margin-bottom: 24px;
+        }
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: rgba(255,255,255,0.5);
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .footer a {
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            margin: 0 12px;
+        }
+        .footer a:hover {
+            color: #667eea;
+        }
+        .phone-mockup {
+            max-width: 300px;
+            margin: 40px auto;
+            border-radius: 40px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+        }
+        .phone-mockup img {
+            width: 100%;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <h1 class="logo">Haven</h1>
+        <p class="tagline">Connection Made Comfortable</p>
+        <p class="subtitle">A dating and friendship app designed for neurodivergent individuals. Practice conversations, build confidence, and find your people.</p>
+        <a href="https://apps.apple.com/app/haven" class="app-store-btn">
+            <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Download on the App Store">
+        </a>
+    </div>
+
+    <div class="features">
+        <div class="feature-card">
+            <div class="feature-icon">🎙️</div>
+            <h3 class="feature-title">AI Practice Partners</h3>
+            <p class="feature-desc">Practice conversations with understanding AI companions who remember you and adapt to your communication style.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">💜</div>
+            <h3 class="feature-title">Built for You</h3>
+            <p class="feature-desc">Designed specifically for autistic and neurodivergent individuals. No masking required - just be yourself.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">🔒</div>
+            <h3 class="feature-title">Safe Space</h3>
+            <p class="feature-desc">A judgement-free environment where you can build social confidence at your own pace.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">🌟</div>
+            <h3 class="feature-title">Real Connections</h3>
+            <p class="feature-desc">When you're ready, connect with real people who understand and appreciate neurodiversity.</p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Why Haven?</h2>
+        <p class="section-text">Dating apps weren't designed with us in mind. Haven changes that. We understand that social interactions can be challenging, and we're here to help you build skills and confidence in a supportive environment.</p>
+
+        <div class="testimonial">
+            "Finally, an app that gets it. I can practice without the pressure, and the AI companions actually remember what we talked about."
+            <p class="testimonial-author">- Sarah, Haven User</p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Features</h2>
+        <p class="section-text">
+            ✓ Voice conversations with AI companions<br>
+            ✓ Memory that persists across chats<br>
+            ✓ Emotional intelligence and support<br>
+            ✓ Match with real people when ready<br>
+            ✓ No time pressure or social stress<br>
+            ✓ Privacy-first design
+        </p>
+    </div>
+
+    <div class="cta">
+        <h2>Ready to Find Your Haven?</h2>
+        <p>Download now and start your journey to confident connections.</p>
+        <a href="https://apps.apple.com/app/haven" class="app-store-btn">
+            <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Download on the App Store">
+        </a>
+    </div>
+
+    <div class="footer">
+        <p>&copy; 2026 Haven. All rights reserved.</p>
+        <p style="margin-top: 12px;">
+            <a href="support.html">Support</a>
+            <a href="privacy.html">Privacy Policy</a>
+            <a href="terms.html">Terms of Service</a>
+        </p>
+    </div>
+</body>
+</html>

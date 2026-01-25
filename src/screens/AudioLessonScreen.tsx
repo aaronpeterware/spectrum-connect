@@ -8,12 +8,15 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import {
   getAudioScenarioById,
@@ -24,6 +27,59 @@ import {
 } from '../data/audioLessonData';
 import { API_CONFIG } from '../config/api';
 import { ProgressStorage, UserProgress, LessonProgress } from './ClassroomScreen';
+import { Asset } from 'expo-asset';
+
+// Pre-generated audio file mapping
+const AUDIO_ASSETS: Record<string, Record<number, any>> = {
+  'audio_1_1': {
+    0: require('../../assets/audio/scenarios/audio_1_1/segment_00.mp3'),
+    1: require('../../assets/audio/scenarios/audio_1_1/segment_01.mp3'),
+    2: require('../../assets/audio/scenarios/audio_1_1/segment_02.mp3'),
+    3: require('../../assets/audio/scenarios/audio_1_1/segment_03.mp3'),
+    4: require('../../assets/audio/scenarios/audio_1_1/segment_04.mp3'),
+    5: require('../../assets/audio/scenarios/audio_1_1/segment_05.mp3'),
+    6: require('../../assets/audio/scenarios/audio_1_1/segment_06.mp3'),
+    7: require('../../assets/audio/scenarios/audio_1_1/segment_07.mp3'),
+    8: require('../../assets/audio/scenarios/audio_1_1/segment_08.mp3'),
+    9: require('../../assets/audio/scenarios/audio_1_1/segment_09.mp3'),
+  },
+  'audio_1_2': {
+    0: require('../../assets/audio/scenarios/audio_1_2/segment_00.mp3'),
+    1: require('../../assets/audio/scenarios/audio_1_2/segment_01.mp3'),
+    2: require('../../assets/audio/scenarios/audio_1_2/segment_02.mp3'),
+    3: require('../../assets/audio/scenarios/audio_1_2/segment_03.mp3'),
+    4: require('../../assets/audio/scenarios/audio_1_2/segment_04.mp3'),
+    5: require('../../assets/audio/scenarios/audio_1_2/segment_05.mp3'),
+    6: require('../../assets/audio/scenarios/audio_1_2/segment_06.mp3'),
+    7: require('../../assets/audio/scenarios/audio_1_2/segment_07.mp3'),
+  },
+  'audio_1_3': {
+    0: require('../../assets/audio/scenarios/audio_1_3/segment_00.mp3'),
+    1: require('../../assets/audio/scenarios/audio_1_3/segment_01.mp3'),
+    2: require('../../assets/audio/scenarios/audio_1_3/segment_02.mp3'),
+    3: require('../../assets/audio/scenarios/audio_1_3/segment_03.mp3'),
+    4: require('../../assets/audio/scenarios/audio_1_3/segment_04.mp3'),
+    5: require('../../assets/audio/scenarios/audio_1_3/segment_05.mp3'),
+    6: require('../../assets/audio/scenarios/audio_1_3/segment_06.mp3'),
+    7: require('../../assets/audio/scenarios/audio_1_3/segment_07.mp3'),
+  },
+  'audio_2_1': {
+    0: require('../../assets/audio/scenarios/audio_2_1/segment_00.mp3'),
+    1: require('../../assets/audio/scenarios/audio_2_1/segment_01.mp3'),
+    2: require('../../assets/audio/scenarios/audio_2_1/segment_02.mp3'),
+    3: require('../../assets/audio/scenarios/audio_2_1/segment_03.mp3'),
+    4: require('../../assets/audio/scenarios/audio_2_1/segment_04.mp3'),
+    5: require('../../assets/audio/scenarios/audio_2_1/segment_05.mp3'),
+  },
+  'audio_2_2': {
+    0: require('../../assets/audio/scenarios/audio_2_2/segment_00.mp3'),
+    1: require('../../assets/audio/scenarios/audio_2_2/segment_01.mp3'),
+    2: require('../../assets/audio/scenarios/audio_2_2/segment_02.mp3'),
+    3: require('../../assets/audio/scenarios/audio_2_2/segment_03.mp3'),
+    4: require('../../assets/audio/scenarios/audio_2_2/segment_04.mp3'),
+    5: require('../../assets/audio/scenarios/audio_2_2/segment_05.mp3'),
+  },
+};
 
 const { width } = Dimensions.get('window');
 
@@ -58,16 +114,127 @@ const AudioLessonScreen = () => {
   // Audio
   const soundRef = useRef<Audio.Sound | null>(null);
   const [audioUri, setAudioUri] = useState<string | null>(null);
+  const [audioSegments, setAudioSegments] = useState<Array<{speaker: string, text: string, audioUrl: string}>>([]);
+  const [audioFinished, setAudioFinished] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const playbackRef = useRef<{ cancelled: boolean }>({ cancelled: false });
+
+  // Animation refs for audio visualizer
+  const waveAnimations = useRef(
+    [...Array(12)].map(() => new Animated.Value(0.3))
+  ).current;
+  const pulseAnimation = useRef(new Animated.Value(1)).current;
+  const glowAnimation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Reset all state when scenario changes
+    setPhase('intro');
+    setIsLoading(true);
+    setIsGeneratingAudio(false);
+    setIsPlaying(false);
+    setCurrentLineIndex(0);
+    setAudioProgress(0);
+    setCurrentQuestionIndex(0);
+    setSelectedAnswer(null);
+    setShowExplanation(false);
+    setScore(0);
+    setAudioSegments([]);
+    setAudioFinished(false);
+    setIsPaused(false);
+    playbackRef.current.cancelled = true;
+
+    // Stop any playing audio
+    if (soundRef.current) {
+      soundRef.current.stopAsync();
+      soundRef.current.unloadAsync();
+      soundRef.current = null;
+    }
+
     loadScenario();
+
     return () => {
       // Cleanup audio on unmount
+      playbackRef.current.cancelled = true;
       if (soundRef.current) {
         soundRef.current.unloadAsync();
       }
     };
   }, [scenarioId]);
+
+  // Audio visualization animations
+  useEffect(() => {
+    if (isPlaying) {
+      // Start wave animations
+      const animations = waveAnimations.map((anim, index) => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.timing(anim, {
+              toValue: 0.5 + Math.random() * 0.5,
+              duration: 300 + Math.random() * 400,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+            Animated.timing(anim, {
+              toValue: 0.2 + Math.random() * 0.3,
+              duration: 300 + Math.random() * 400,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      });
+      animations.forEach(anim => anim.start());
+
+      // Pulse animation for the center circle
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnimation, {
+            toValue: 1.15,
+            duration: 1000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnimation, {
+            toValue: 1,
+            duration: 1000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      pulse.start();
+
+      // Glow animation
+      const glow = Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnimation, {
+            toValue: 1,
+            duration: 1500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(glowAnimation, {
+            toValue: 0,
+            duration: 1500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      glow.start();
+
+      return () => {
+        animations.forEach(anim => anim.stop());
+        pulse.stop();
+        glow.stop();
+      };
+    } else {
+      // Reset animations when not playing
+      waveAnimations.forEach(anim => anim.setValue(0.3));
+      pulseAnimation.setValue(1);
+      glowAnimation.setValue(0);
+    }
+  }, [isPlaying]);
 
   const loadScenario = async () => {
     const data = getAudioScenarioById(scenarioId);
@@ -85,57 +252,321 @@ const AudioLessonScreen = () => {
     setPhase('listening');
 
     try {
-      // Request audio generation from our API
-      const response = await fetch(`${API_CONFIG.API_URL}/api/generate-conversation-audio`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          scenarioId: scenario.id,
-          conversation: scenario.conversation
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate audio');
+      // First try to load from local assets
+      const localAudio = AUDIO_ASSETS[scenario.id];
+      if (localAudio) {
+        if (__DEV__) console.log('Found local audio for scenario:', scenario.id);
+        setIsGeneratingAudio(false);
+        await playLocalAudioSegments(scenario.id);
+        return;
       }
 
-      const data = await response.json();
-
-      if (data.audioUrl) {
-        setAudioUri(data.audioUrl);
-        await playAudio(data.audioUrl);
-      } else {
-        // Fallback: simulate audio with text display
-        await simulateAudioPlayback();
-      }
-    } catch (error) {
-      if (__DEV__) console.log('Audio generation error:', error);
-      // Fallback to text-based experience
-      await simulateAudioPlayback();
-    } finally {
+      // Fall back to API if no local audio
+      if (__DEV__) console.log('No local audio found, falling back to simulation');
       setIsGeneratingAudio(false);
+      await simulateAudioPlayback();
+    } catch (error) {
+      if (__DEV__) console.log('Audio playback error:', error);
+      setIsGeneratingAudio(false);
+      await simulateAudioPlayback();
     }
   };
 
-  const simulateAudioPlayback = async () => {
-    // Text-based fallback that shows the conversation line by line
+  // Play audio from local asset files
+  const playLocalAudioSegments = async (scenarioId: string, startIndex = 0) => {
+    if (!scenario) return;
+
+    const audioAssets = AUDIO_ASSETS[scenarioId];
+    if (!audioAssets) {
+      await simulateAudioPlayback();
+      return;
+    }
+
+    const segmentCount = Object.keys(audioAssets).length;
+    setIsPlaying(true);
+    setIsPaused(false);
+    setAudioFinished(false);
+    playbackRef.current.cancelled = false;
+
+    try {
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        allowsRecordingIOS: false,
+      });
+
+      for (let i = startIndex; i < segmentCount; i++) {
+        if (playbackRef.current.cancelled) {
+          break;
+        }
+
+        // Update UI to show current speaker
+        const conversationIndex = Math.min(i, scenario.conversation.length - 1);
+        setCurrentLineIndex(conversationIndex);
+        setAudioProgress((i + 1) / segmentCount);
+
+        if (__DEV__) console.log(`Playing local segment ${i + 1}/${segmentCount}`);
+
+        const { sound } = await Audio.Sound.createAsync(
+          audioAssets[i],
+          { shouldPlay: true }
+        );
+        soundRef.current = sound;
+
+        // Wait for this segment to finish
+        await new Promise<void>((resolve) => {
+          const timeout = setTimeout(() => {
+            if (__DEV__) console.log(`Segment ${i} timed out`);
+            sound.unloadAsync();
+            resolve();
+          }, 30000);
+
+          sound.setOnPlaybackStatusUpdate((status: any) => {
+            if (status.didJustFinish) {
+              clearTimeout(timeout);
+              sound.unloadAsync();
+              soundRef.current = null;
+              resolve();
+            }
+            if (status.error) {
+              clearTimeout(timeout);
+              if (__DEV__) console.log(`Playback error for segment ${i}:`, status.error);
+              sound.unloadAsync();
+              soundRef.current = null;
+              resolve();
+            }
+          });
+        });
+      }
+
+      if (!playbackRef.current.cancelled) {
+        setIsPlaying(false);
+        setAudioFinished(true);
+      }
+    } catch (error) {
+      if (__DEV__) console.log('Local audio playback error:', error);
+      await simulateAudioPlayback();
+    }
+  };
+
+  // Play audio from pre-generated URLs (no temp file needed)
+  const playAudioFromUrls = async (segments: Array<{speaker: string, text: string, audioUrl: string}>, startIndex = 0) => {
+    if (!scenario) return;
+
+    // Store segments for replay
+    setAudioSegments(segments);
+    setIsPlaying(true);
+    setIsPaused(false);
+    setAudioFinished(false);
+    playbackRef.current.cancelled = false;
+
+    try {
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        allowsRecordingIOS: false,
+      });
+
+      for (let i = startIndex; i < segments.length; i++) {
+        // Check if playback was cancelled
+        if (playbackRef.current.cancelled) {
+          break;
+        }
+
+        // Update UI to show current speaker
+        const conversationIndex = Math.min(i, scenario.conversation.length - 1);
+        setCurrentLineIndex(conversationIndex);
+        setAudioProgress((i + 1) / segments.length);
+
+        if (__DEV__) console.log(`Playing segment ${i + 1}/${segments.length} from URL: ${segments[i].audioUrl}`);
+
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: segments[i].audioUrl },
+          { shouldPlay: true }
+        );
+        soundRef.current = sound;
+
+        // Wait for this segment to finish
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            if (__DEV__) console.log(`Segment ${i} timed out`);
+            sound.unloadAsync();
+            resolve();
+          }, 30000); // 30 second timeout per segment
+
+          sound.setOnPlaybackStatusUpdate((status: any) => {
+            if (status.didJustFinish) {
+              clearTimeout(timeout);
+              sound.unloadAsync();
+              soundRef.current = null;
+              resolve();
+            }
+            if (status.error) {
+              clearTimeout(timeout);
+              if (__DEV__) console.log(`Playback error for segment ${i}:`, status.error);
+              sound.unloadAsync();
+              soundRef.current = null;
+              reject(new Error(status.error));
+            }
+          });
+        });
+      }
+
+      if (!playbackRef.current.cancelled) {
+        setIsPlaying(false);
+        setAudioFinished(true);
+      }
+    } catch (error) {
+      if (__DEV__) console.log('URL audio playback error:', error);
+      // Fallback to text simulation
+      await simulateAudioPlayback();
+    }
+  };
+
+  // Replay audio from beginning
+  const replayAudio = () => {
+    if (audioSegments.length > 0) {
+      setCurrentLineIndex(0);
+      setAudioProgress(0);
+      playAudioFromUrls(audioSegments, 0);
+    } else {
+      generateAndPlayAudio();
+    }
+  };
+
+  // Go to quiz
+  const goToQuiz = () => {
+    playbackRef.current.cancelled = true;
+    if (soundRef.current) {
+      soundRef.current.stopAsync();
+      soundRef.current.unloadAsync();
+      soundRef.current = null;
+    }
+    setIsPlaying(false);
+    setPhase('quiz');
+  };
+
+  const playAudioSegments = async (segments: Array<{speaker: string, audio: string}>) => {
     if (!scenario) return;
 
     setIsPlaying(true);
 
-    for (let i = 0; i < scenario.conversation.length; i++) {
+    try {
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        allowsRecordingIOS: false,
+      });
+
+      for (let i = 0; i < segments.length; i++) {
+        // Update UI to show current speaker
+        const conversationIndex = Math.min(i, scenario.conversation.length - 1);
+        setCurrentLineIndex(conversationIndex);
+        setAudioProgress((i + 1) / segments.length);
+
+        // Write base64 audio to a temp file (expo-av doesn't support data URIs)
+        const audioBase64 = segments[i].audio;
+        const tempFilePath = `${FileSystem.cacheDirectory}audio_segment_${i}.mp3`;
+
+        await FileSystem.writeAsStringAsync(tempFilePath, audioBase64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        if (__DEV__) console.log(`Playing segment ${i + 1}/${segments.length} from ${tempFilePath}`);
+
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: tempFilePath },
+          { shouldPlay: true }
+        );
+
+        // Wait for this segment to finish
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            if (__DEV__) console.log(`Segment ${i} timed out`);
+            sound.unloadAsync();
+            resolve();
+          }, 30000); // 30 second timeout per segment
+
+          sound.setOnPlaybackStatusUpdate((status: any) => {
+            if (status.didJustFinish) {
+              clearTimeout(timeout);
+              sound.unloadAsync();
+              // Clean up temp file
+              FileSystem.deleteAsync(tempFilePath, { idempotent: true }).catch(() => {});
+              resolve();
+            }
+            if (status.error) {
+              clearTimeout(timeout);
+              if (__DEV__) console.log(`Playback error for segment ${i}:`, status.error);
+              sound.unloadAsync();
+              reject(new Error(status.error));
+            }
+          });
+        });
+      }
+
+      setIsPlaying(false);
+      setPhase('quiz');
+    } catch (error) {
+      if (__DEV__) console.log('Audio segment playback error:', error);
+      // Fallback to text simulation
+      await simulateAudioPlayback();
+    }
+  };
+
+  const simulateAudioPlayback = async (startIndex = 0) => {
+    // Text-based fallback that shows the conversation line by line
+    if (!scenario) return;
+
+    setIsPlaying(true);
+    setIsPaused(false);
+    playbackRef.current.cancelled = false;
+
+    for (let i = startIndex; i < scenario.conversation.length; i++) {
+      // Check if playback was cancelled or paused
+      if (playbackRef.current.cancelled) {
+        break;
+      }
+
       setCurrentLineIndex(i);
       setAudioProgress((i + 1) / scenario.conversation.length);
 
-      // Calculate delay based on text length (roughly 100ms per character)
+      // Calculate delay based on text length (roughly 80ms per character)
       const line = scenario.conversation[i];
-      const delay = Math.max(2000, line.text.length * 80);
+      const delay = Math.max(2500, line.text.length * 80);
 
-      await new Promise(resolve => setTimeout(resolve, delay));
+      // Wait with ability to cancel
+      await new Promise<void>(resolve => {
+        const checkInterval = setInterval(() => {
+          if (playbackRef.current.cancelled) {
+            clearInterval(checkInterval);
+            resolve();
+          }
+        }, 100);
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          resolve();
+        }, delay);
+      });
     }
 
-    setIsPlaying(false);
-    setPhase('quiz');
+    if (!playbackRef.current.cancelled) {
+      setIsPlaying(false);
+      setAudioFinished(true);
+    }
+  };
+
+  const toggleSimulationPlayPause = () => {
+    if (isPlaying) {
+      // Pause
+      playbackRef.current.cancelled = true;
+      setIsPlaying(false);
+      setIsPaused(true);
+    } else {
+      // Resume from current position
+      setIsPaused(false);
+      simulateAudioPlayback(currentLineIndex);
+    }
   };
 
   const playAudio = async (uri: string) => {
@@ -352,82 +783,197 @@ const AudioLessonScreen = () => {
 
     return (
       <View style={styles.listeningContainer}>
+        {/* Animated Background Gradient */}
+        <LinearGradient
+          colors={['#1A1A2E', '#2D1B4E', '#1A1A2E']}
+          style={StyleSheet.absoluteFillObject}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+
+        {/* Animated Glow Circles */}
+        <Animated.View
+          style={[
+            styles.glowCircle,
+            styles.glowCircle1,
+            {
+              opacity: glowAnimation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.1, 0.3],
+              }),
+              transform: [{ scale: pulseAnimation }],
+            },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.glowCircle,
+            styles.glowCircle2,
+            {
+              opacity: glowAnimation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.15, 0.25],
+              }),
+            },
+          ]}
+        />
+
         {isGeneratingAudio ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.primary} />
+            <View style={styles.loadingPulse}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
             <Text style={styles.loadingText}>Preparing audio...</Text>
           </View>
         ) : (
           <>
-            {/* Audio Visualizer */}
-            <View style={styles.audioVisualizer}>
-              <View style={styles.waveformContainer}>
-                {[...Array(20)].map((_, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.waveformBar,
-                      isPlaying && {
-                        height: 20 + Math.random() * 40,
-                        backgroundColor: Colors.primary
-                      }
-                    ]}
-                  />
-                ))}
+            {/* Central Audio Visualizer */}
+            <View style={styles.visualizerSection}>
+              {/* Animated Ring */}
+              <Animated.View
+                style={[
+                  styles.outerRing,
+                  { transform: [{ scale: pulseAnimation }] },
+                ]}
+              >
+                <LinearGradient
+                  colors={['rgba(139, 92, 246, 0.3)', 'rgba(236, 72, 153, 0.3)']}
+                  style={styles.outerRingGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                />
+              </Animated.View>
+
+              {/* Waveform Circle */}
+              <View style={styles.waveformCircle}>
+                <LinearGradient
+                  colors={[Colors.primary, '#EC4899']}
+                  style={styles.waveformCircleInner}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  {/* Animated Bars */}
+                  <View style={styles.barsContainer}>
+                    {waveAnimations.map((anim, i) => (
+                      <Animated.View
+                        key={i}
+                        style={[
+                          styles.waveBar,
+                          {
+                            transform: [{ scaleY: anim }],
+                          },
+                        ]}
+                      />
+                    ))}
+                  </View>
+                </LinearGradient>
+              </View>
+
+              {/* Speaker Badge */}
+              <View style={styles.speakerBadge}>
+                <LinearGradient
+                  colors={['rgba(139, 92, 246, 0.9)', 'rgba(99, 102, 241, 0.9)']}
+                  style={styles.speakerBadgeGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <Ionicons name="person" size={16} color="white" />
+                  <Text style={styles.speakerBadgeText}>{currentLine?.speaker}</Text>
+                </LinearGradient>
               </View>
             </View>
 
-            {/* Progress Bar */}
-            <View style={styles.progressBarContainer}>
-              <View style={[styles.progressBar, { width: `${audioProgress * 100}%` }]} />
-            </View>
-
-            {/* Current Speaker */}
-            <View style={styles.speakerCard}>
-              <View style={styles.speakerAvatar}>
-                <Ionicons name="person" size={24} color="white" />
-              </View>
-              <View style={styles.speakerInfo}>
-                <Text style={styles.speakerName}>{currentLine?.speaker}</Text>
+            {/* Progress Section */}
+            <View style={styles.progressSection}>
+              <View style={styles.progressInfo}>
+                <Text style={styles.progressLabel}>
+                  {currentLineIndex + 1} of {scenario.conversation.length}
+                </Text>
                 {currentLine?.emotion && (
-                  <Text style={styles.speakerEmotion}>({currentLine.emotion})</Text>
+                  <View style={styles.emotionBadge}>
+                    <Text style={styles.emotionText}>{currentLine.emotion}</Text>
+                  </View>
                 )}
               </View>
+              <View style={styles.progressBarContainer}>
+                <LinearGradient
+                  colors={[Colors.primary, '#EC4899']}
+                  style={[styles.progressBar, { width: `${audioProgress * 100}%` }]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                />
+              </View>
             </View>
 
-            {/* Transcript */}
+            {/* Transcript Card */}
             <View style={styles.transcriptCard}>
+              <View style={styles.quoteIcon}>
+                <Ionicons name="chatbubble-ellipses" size={20} color={Colors.primary} />
+              </View>
               <Text style={styles.transcriptText}>"{currentLine?.text}"</Text>
               {currentLine?.bodyLanguage && (
-                <Text style={styles.bodyLanguageText}>
-                  <Ionicons name="eye" size={12} color={Colors.gray400} /> {currentLine.bodyLanguage}
-                </Text>
+                <View style={styles.bodyLanguageContainer}>
+                  <Ionicons name="eye-outline" size={14} color={Colors.gray400} />
+                  <Text style={styles.bodyLanguageText}>{currentLine.bodyLanguage}</Text>
+                </View>
               )}
             </View>
 
-            {/* Controls */}
-            <View style={styles.controlsContainer}>
-              <TouchableOpacity
-                style={styles.controlButton}
-                onPress={togglePlayPause}
-                disabled={!audioUri}
-              >
-                <Ionicons
-                  name={isPlaying ? "pause" : "play"}
-                  size={32}
-                  color="white"
-                />
-              </TouchableOpacity>
-            </View>
+            {/* Control Buttons */}
+            {audioFinished ? (
+              <View style={styles.controlButtonsRow}>
+                <TouchableOpacity
+                  style={styles.replayButton}
+                  onPress={replayAudio}
+                >
+                  <Ionicons name="refresh" size={22} color={Colors.primary} />
+                  <Text style={styles.replayButtonText}>Replay</Text>
+                </TouchableOpacity>
 
-            {/* Skip to Quiz */}
-            <TouchableOpacity
-              style={styles.skipButton}
-              onPress={() => setPhase('quiz')}
-            >
-              <Text style={styles.skipText}>Skip to Questions</Text>
-              <Ionicons name="chevron-forward" size={16} color={Colors.gray400} />
-            </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.continueToQuizButton}
+                  onPress={goToQuiz}
+                >
+                  <LinearGradient
+                    colors={[Colors.primary, '#8B5CF6']}
+                    style={styles.continueToQuizGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    <Text style={styles.continueToQuizText}>Continue to Quiz</Text>
+                    <Ionicons name="arrow-forward" size={20} color="white" />
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.controlButtonsRow}>
+                {/* Play/Pause Button */}
+                <TouchableOpacity
+                  style={styles.playPauseButton}
+                  onPress={toggleSimulationPlayPause}
+                >
+                  <LinearGradient
+                    colors={[Colors.primary, '#8B5CF6']}
+                    style={styles.playPauseGradient}
+                  >
+                    <Ionicons
+                      name={isPlaying ? 'pause' : 'play'}
+                      size={32}
+                      color="white"
+                    />
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                {/* Skip Button */}
+                <TouchableOpacity
+                  style={styles.skipButtonSmall}
+                  onPress={goToQuiz}
+                >
+                  <Text style={styles.skipText}>Skip to Quiz</Text>
+                  <Ionicons name="chevron-forward" size={16} color={Colors.gray400} />
+                </TouchableOpacity>
+              </View>
+            )}
           </>
         )}
       </View>
@@ -890,68 +1436,144 @@ const styles = StyleSheet.create({
   listeningContainer: {
     flex: 1,
     padding: Spacing.lg,
-  },
-  audioVisualizer: {
-    height: 100,
     justifyContent: 'center',
+  },
+  glowCircle: {
+    position: 'absolute',
+    borderRadius: 999,
+  },
+  glowCircle1: {
+    width: 300,
+    height: 300,
+    backgroundColor: '#8B5CF6',
+    top: '15%',
+    left: '50%',
+    marginLeft: -150,
+  },
+  glowCircle2: {
+    width: 200,
+    height: 200,
+    backgroundColor: '#EC4899',
+    bottom: '25%',
+    right: -50,
+  },
+  loadingPulse: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: Spacing.lg,
   },
-  waveformContainer: {
+  visualizerSection: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.xl,
+  },
+  outerRing: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    overflow: 'hidden',
+  },
+  outerRingGradient: {
+    flex: 1,
+    borderRadius: 100,
+  },
+  waveformCircle: {
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    overflow: 'hidden',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  waveformCircleInner: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 80,
+  },
+  barsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
     height: 60,
   },
-  waveformBar: {
-    width: 4,
-    height: 20,
-    backgroundColor: Colors.gray600,
-    borderRadius: 2,
+  waveBar: {
+    width: 6,
+    height: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 3,
+  },
+  speakerBadge: {
+    marginTop: Spacing.lg,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  speakerBadgeGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  speakerBadgeText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  progressSection: {
+    marginBottom: Spacing.lg,
+  },
+  progressInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.sm,
+  },
+  progressLabel: {
+    color: Colors.gray400,
+    fontSize: 14,
+  },
+  emotionBadge: {
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  emotionText: {
+    color: Colors.primary,
+    fontSize: 12,
+    fontWeight: '500',
+    fontStyle: 'italic',
   },
   progressBarContainer: {
-    height: 4,
+    height: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 2,
-    marginBottom: Spacing.xl,
+    borderRadius: 3,
+    overflow: 'hidden',
   },
   progressBar: {
     height: '100%',
-    backgroundColor: Colors.primary,
-    borderRadius: 2,
-  },
-  speakerCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: Spacing.lg,
-  },
-  speakerAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  speakerInfo: {
-    flex: 1,
-  },
-  speakerName: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  speakerEmotion: {
-    color: Colors.gray400,
-    fontSize: 14,
-    fontStyle: 'italic',
+    borderRadius: 3,
   },
   transcriptCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     padding: Spacing.lg,
     borderRadius: BorderRadius.xl,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.2)',
+  },
+  quoteIcon: {
+    marginBottom: Spacing.sm,
   },
   transcriptText: {
     color: 'white',
@@ -959,33 +1581,94 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     fontStyle: 'italic',
   },
+  bodyLanguageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
   bodyLanguageText: {
     color: Colors.gray400,
     fontSize: 14,
-    marginTop: Spacing.md,
-    fontStyle: 'italic',
-  },
-  controlsContainer: {
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
-  },
-  controlButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+    flex: 1,
   },
   skipButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
+    paddingVertical: Spacing.md,
+  },
+  skipButtonSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
   },
   skipText: {
     color: Colors.gray400,
     fontSize: 14,
+  },
+  playPauseButton: {
+    borderRadius: 35,
+    overflow: 'hidden',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  playPauseGradient: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  controlButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    marginTop: Spacing.md,
+  },
+  replayButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+  },
+  replayButtonText: {
+    color: Colors.primary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  continueToQuizButton: {
+    flex: 1,
+    borderRadius: BorderRadius.xl,
+    overflow: 'hidden',
+  },
+  continueToQuizGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+  },
+  continueToQuizText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 
   // Quiz Phase

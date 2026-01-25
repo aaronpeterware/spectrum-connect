@@ -1,0 +1,43 @@
+{
+  "scenarioId": "audio_2_2",
+  "title": "Detecting Discomfort",
+  "segments": [
+    {
+      "index": 0,
+      "speaker": "Jamie",
+      "filename": "segment_00.mp3",
+      "text": "So how's it going with that person you were dating? You two seemed really happy last time I saw you."
+    },
+    {
+      "index": 1,
+      "speaker": "Sam",
+      "filename": "segment_01.mp3",
+      "text": "Oh... yeah. Um, that didn't really work out actually."
+    },
+    {
+      "index": 2,
+      "speaker": "Jamie",
+      "filename": "segment_02.mp3",
+      "text": "Oh no, what happened? You guys seemed so good together!"
+    },
+    {
+      "index": 3,
+      "speaker": "Sam",
+      "filename": "segment_03.mp3",
+      "text": "It's... complicated. I don't really want to get into it, you know?"
+    },
+    {
+      "index": 4,
+      "speaker": "Jamie",
+      "filename": "segment_04.mp3",
+      "text": "Oh, totally. I get it. Hey, let's talk about something else - did you end up going to that concert last weekend?"
+    },
+    {
+      "index": 5,
+      "speaker": "Sam",
+      "filename": "segment_05.mp3",
+      "text": "Yes! Oh my god, it was amazing. The opener was actually better than I expected..."
+    }
+  ],
+  "generatedAt": "2026-01-21T03:33:42.933Z"
+}

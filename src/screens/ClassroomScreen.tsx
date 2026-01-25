@@ -7,89 +7,92 @@ import {
   TouchableOpacity,
   Dimensions,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system/legacy';
-import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
-import { MODULES, PRACTICE_EXAMS, Module, Lesson } from '../data/lessonData';
+import { Colors, Spacing, BorderRadius } from '../constants/theme';
+import { MODULES as STATIC_MODULES, PRACTICE_EXAMS, Module } from '../data/lessonData';
+import { fetchModules } from '../services/courseService';
+import MenuModal from '../components/MenuModal';
+import {
+  getUserProgress,
+  saveUserProgress,
+  UserProgress,
+  LessonProgress,
+  ModuleProgress,
+  ExamScore,
+} from '../services/userProgressService';
+import { useTheme } from '../hooks/useTheme';
 
 const { width } = Dimensions.get('window');
 
-// Progress storage
+// Daily tips for the banner
+const DAILY_TIPS = [
+  { title: 'Active Listening', tip: 'Try nodding occasionally to show you\'re following the conversation.' },
+  { title: 'Eye Contact', tip: 'Looking at someone\'s forehead or nose bridge can feel more comfortable than direct eye contact.' },
+  { title: 'Taking Turns', tip: 'Count to 3 in your head after someone finishes speaking before you respond.' },
+  { title: 'Body Language', tip: 'Open posture (uncrossed arms) signals that you\'re engaged and approachable.' },
+  { title: 'Small Talk Starter', tip: 'Commenting on your shared environment is an easy way to start a conversation.' },
+  { title: 'Managing Overwhelm', tip: 'It\'s okay to take a break. Saying "I need a moment" is perfectly acceptable.' },
+  { title: 'Showing Interest', tip: 'Asking follow-up questions shows you\'re genuinely interested in what someone is saying.' },
+];
+
+// Re-export types for backwards compatibility
+export type { UserProgress, LessonProgress, ModuleProgress, ExamScore };
+
+// Legacy ProgressStorage for backwards compatibility (now uses cloud service)
 export const ProgressStorage = {
-  async getProgress(): Promise<UserProgress | null> {
-    try {
-      const filePath = `${FileSystem.documentDirectory}classroom_progress.json`;
-      const info = await FileSystem.getInfoAsync(filePath);
-      if (!info.exists) return null;
-      const data = await FileSystem.readAsStringAsync(filePath);
-      return JSON.parse(data);
-    } catch {
-      return null;
-    }
-  },
-  async saveProgress(progress: UserProgress): Promise<void> {
-    try {
-      const filePath = `${FileSystem.documentDirectory}classroom_progress.json`;
-      await FileSystem.writeAsStringAsync(filePath, JSON.stringify(progress));
-    } catch (e) {
-      if (__DEV__) console.log('Error saving progress:', e);
-    }
-  }
+  getProgress: getUserProgress,
+  saveProgress: saveUserProgress,
 };
 
-export interface LessonProgress {
-  lessonId: string;
-  completed: boolean;
-  quizScore?: number;
-  quizAttempts: number;
-  bestScore: number;
-  completedAt?: string;
-}
+// Module icons mapping
+const MODULE_ICONS: Record<string, string> = {
+  'module1': 'chatbubble',
+  'module2': 'heart',
+  'module3': 'people',
+  'module4': 'sparkles',
+};
 
-export interface ModuleProgress {
-  moduleId: string;
-  lessonsCompleted: number;
-  totalLessons: number;
-  examScore?: number;
-  examPassed: boolean;
-}
-
-export interface ExamScore {
-  examId: string;
-  score: number;
-  passed: boolean;
-  attempts: number;
-  bestScore: number;
-  completedAt?: string;
-}
-
-export interface UserProgress {
-  totalXP: number;
-  level: number;
-  lessonsCompleted: LessonProgress[];
-  modulesProgress: ModuleProgress[];
-  examScores: ExamScore[];
-  streakDays: number;
-  lastActivityDate?: string;
-}
+// Module images (placeholder abstract images)
+const MODULE_IMAGES: Record<string, string> = {
+  'module1': 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=200&h=200&fit=crop',
+  'module2': 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=200&h=200&fit=crop',
+  'module3': 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=200&h=200&fit=crop',
+  'module4': 'https://images.unsplash.com/photo-1521791136064-7986c2920216?w=200&h=200&fit=crop',
+};
 
 const ClassroomScreen = () => {
+  const { colors, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const [progress, setProgress] = useState<UserProgress | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'modules' | 'exams'>('modules');
+  const [modules, setModules] = useState<Module[]>(STATIC_MODULES);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [dailyTip] = useState(() => DAILY_TIPS[Math.floor(Math.random() * DAILY_TIPS.length)]);
 
   useEffect(() => {
+    loadModules();
     loadProgress();
   }, []);
 
-  // Refresh progress when screen comes into focus
+  const loadModules = async () => {
+    try {
+      const dynamicModules = await fetchModules();
+      if (dynamicModules && dynamicModules.length > 0) {
+        setModules(dynamicModules);
+      }
+    } catch (error) {
+      console.log('Using static modules:', error);
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
+      loadModules();
       loadProgress();
     });
     return unsubscribe;
@@ -100,12 +103,11 @@ const ClassroomScreen = () => {
     if (savedProgress) {
       setProgress(savedProgress);
     } else {
-      // Initialize new progress
       const initialProgress: UserProgress = {
         totalXP: 0,
         level: 1,
         lessonsCompleted: [],
-        modulesProgress: MODULES.map(m => ({
+        modulesProgress: modules.map(m => ({
           moduleId: m.id,
           lessonsCompleted: 0,
           totalLessons: m.lessons.length,
@@ -120,14 +122,6 @@ const ClassroomScreen = () => {
     setLoading(false);
   };
 
-  const getLessonProgress = (lessonId: string): LessonProgress | undefined => {
-    return progress?.lessonsCompleted.find(l => l.lessonId === lessonId);
-  };
-
-  const getModuleProgress = (moduleId: string): ModuleProgress | undefined => {
-    return progress?.modulesProgress.find(m => m.moduleId === moduleId);
-  };
-
   const getModuleCompletionPercent = (module: Module): number => {
     if (!progress) return 0;
     const completedLessons = module.lessons.filter(l =>
@@ -136,110 +130,125 @@ const ClassroomScreen = () => {
     return Math.round((completedLessons / module.lessons.length) * 100);
   };
 
-  const navigateToLesson = (module: Module, lesson: Lesson) => {
-    navigation.navigate('Lesson', { moduleId: module.id, lessonId: lesson.id });
+  const getCompletedLessonsCount = (module: Module): number => {
+    if (!progress) return 0;
+    return module.lessons.filter(l =>
+      progress.lessonsCompleted.some(lp => lp.lessonId === l.id && lp.completed)
+    ).length;
   };
 
-  const navigateToExam = (examId: string) => {
-    navigation.navigate('PracticeExam', { examId });
+  const navigateToModule = (module: Module) => {
+    // Navigate to first incomplete lesson, or first lesson if all complete
+    const firstIncompleteLesson = module.lessons.find(l =>
+      !progress?.lessonsCompleted.some(lp => lp.lessonId === l.id && lp.completed)
+    );
+    const targetLesson = firstIncompleteLesson || module.lessons[0];
+    navigation.navigate('Lesson', { moduleId: module.id, lessonId: targetLesson.id });
   };
 
-  // Map module IDs to their corresponding practice exam IDs
-  const getModuleExamId = (moduleId: string): string | null => {
-    const examMap: Record<string, string> = {
-      'module1': 'exam_conversation',
-      'module2': 'exam_social_cues',
-      'module3': 'exam_dating',
-      'module4': 'exam_dating',
-    };
-    return examMap[moduleId] || null;
-  };
+  // Group modules by category
+  const foundationsModules = modules.filter(m =>
+    m.id === 'module1' || m.id === 'module2' || m.title.toLowerCase().includes('conversation') || m.title.toLowerCase().includes('cue')
+  );
+  const wellbeingModules = modules.filter(m =>
+    !foundationsModules.includes(m)
+  );
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
+      <SafeAreaView style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Loading your progress...</Text>
+        <Text style={[styles.loadingText, { color: colors.text }]}>Loading your progress...</Text>
       </SafeAreaView>
     );
   }
 
+  const renderModuleCard = (module: Module) => {
+    const completionPercent = getModuleCompletionPercent(module);
+    const completedCount = getCompletedLessonsCount(module);
+    const totalCount = module.lessons.length;
+    const iconName = MODULE_ICONS[module.id] || 'book';
+    const imageUrl = MODULE_IMAGES[module.id];
+
+    return (
+      <TouchableOpacity
+        key={module.id}
+        style={[styles.moduleCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}
+        onPress={() => navigateToModule(module)}
+        activeOpacity={0.8}
+      >
+        <View style={styles.moduleCardContent}>
+          <View style={styles.moduleCardLeft}>
+            <View style={styles.moduleCardHeader}>
+              <View style={styles.moduleIconSmall}>
+                <Ionicons name={iconName as any} size={18} color={Colors.primary} />
+              </View>
+              <Text style={[styles.moduleCardTitle, { color: colors.text }]}>{module.title}</Text>
+            </View>
+            <Text style={[styles.moduleCardDescription, { color: colors.textSecondary }]} numberOfLines={2}>
+              {module.description}
+            </Text>
+          </View>
+          {imageUrl && (
+            <Image
+              source={{ uri: imageUrl }}
+              style={styles.moduleCardImage}
+            />
+          )}
+        </View>
+
+        {/* Progress Bar */}
+        <View style={styles.progressSection}>
+          <View style={styles.progressHeader}>
+            <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>PROGRESS</Text>
+            <Text style={[styles.progressText, { color: colors.text }]}>
+              {completedCount}/{totalCount} lessons ({completionPercent}%)
+            </Text>
+          </View>
+          <View style={styles.progressBarBg}>
+            <View
+              style={[
+                styles.progressBarFill,
+                { width: `${completionPercent}%` }
+              ]}
+            />
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="white" />
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <View style={styles.headerSpacer} />
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Learning Hub</Text>
+        <TouchableOpacity
+          style={styles.headerIconButton}
+          onPress={() => setMenuVisible(true)}
+        >
+          <Ionicons name="menu" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Classroom</Text>
-        <View style={styles.xpBadge}>
-          <Ionicons name="star" size={16} color="#FFD700" />
-          <Text style={styles.xpText}>{progress?.totalXP || 0} XP</Text>
-        </View>
       </View>
 
-      {/* Progress Summary */}
-      <View style={styles.progressSummary}>
-        <View style={styles.levelCard}>
-          <Text style={styles.levelLabel}>Level</Text>
-          <Text style={styles.levelNumber}>{progress?.level || 1}</Text>
-        </View>
-        <View style={styles.statsCard}>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>
-              {progress?.lessonsCompleted.filter(l => l.completed).length || 0}
-            </Text>
-            <Text style={styles.statLabel}>Lessons</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{progress?.streakDays || 0}</Text>
-            <Text style={styles.statLabel}>Streak</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>
-              {progress?.examScores.filter(e => e.passed).length || 0}
-            </Text>
-            <Text style={styles.statLabel}>Passed</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Tab Selector */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'modules' && styles.tabActive]}
-          onPress={() => setActiveTab('modules')}
-        >
-          <Ionicons
-            name="book"
-            size={20}
-            color={activeTab === 'modules' ? Colors.primary : Colors.gray400}
-          />
-          <Text style={[styles.tabText, activeTab === 'modules' && styles.tabTextActive]}>
-            Modules
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'exams' && styles.tabActive]}
-          onPress={() => setActiveTab('exams')}
-        >
-          <Ionicons
-            name="clipboard"
-            size={20}
-            color={activeTab === 'exams' ? Colors.primary : Colors.gray400}
-          />
-          <Text style={[styles.tabText, activeTab === 'exams' && styles.tabTextActive]}>
-            Practice Exams
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* Menu Modal */}
+      <MenuModal visible={menuVisible} onClose={() => setMenuVisible(false)} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* Daily Tip Banner */}
+        <View style={styles.dailyTipCard}>
+          <View style={styles.dailyTipHeader}>
+            <Ionicons name="bulb" size={20} color={Colors.primary} />
+            <Text style={[styles.dailyTipLabel, { color: colors.text }]}>DAILY TIP</Text>
+          </View>
+          <Text style={[styles.dailyTipTitle, { color: colors.text }]}>{dailyTip.title}</Text>
+          <Text style={[styles.dailyTipText, { color: colors.textSecondary }]}>{dailyTip.tip}</Text>
+        </View>
+
         {/* Audio Lessons Feature Card */}
         <TouchableOpacity
           style={styles.audioLessonsCard}
@@ -247,13 +256,13 @@ const ClassroomScreen = () => {
           activeOpacity={0.8}
         >
           <LinearGradient
-            colors={['#8B5CF6', '#6366F1']}
+            colors={[Colors.primary, Colors.primaryDark]}
             style={styles.audioLessonsGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
             <View style={styles.audioLessonsIcon}>
-              <Ionicons name="ear" size={28} color="white" />
+              <Ionicons name="ear" size={24} color="white" />
             </View>
             <View style={styles.audioLessonsContent}>
               <View style={styles.audioLessonsHeader}>
@@ -270,168 +279,59 @@ const ClassroomScreen = () => {
           </LinearGradient>
         </TouchableOpacity>
 
-        {activeTab === 'modules' ? (
+        {/* Foundations Section */}
+        {foundationsModules.length > 0 && (
           <>
-            {MODULES.map((module, index) => (
-              <View key={module.id} style={styles.moduleCard}>
-                <LinearGradient
-                  colors={[module.color, `${module.color}CC`]}
-                  style={styles.moduleHeader}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <View style={styles.moduleIconContainer}>
-                    <Ionicons name={module.icon as any} size={28} color="white" />
-                  </View>
-                  <View style={styles.moduleInfo}>
-                    <Text style={styles.moduleWeek}>{module.weekRange}</Text>
-                    <Text style={styles.moduleTitle}>{module.title}</Text>
-                    <Text style={styles.moduleDescription}>{module.description}</Text>
-                  </View>
-                  <View style={styles.moduleProgress}>
-                    <Text style={styles.progressPercent}>
-                      {getModuleCompletionPercent(module)}%
-                    </Text>
-                  </View>
-                </LinearGradient>
-
-                {/* Progress Bar */}
-                <View style={styles.progressBarContainer}>
-                  <View
-                    style={[
-                      styles.progressBar,
-                      { width: `${getModuleCompletionPercent(module)}%`, backgroundColor: module.color }
-                    ]}
-                  />
-                </View>
-
-                {/* Lessons */}
-                <View style={styles.lessonsContainer}>
-                  {module.lessons.map((lesson, lessonIndex) => {
-                    const lessonProgress = getLessonProgress(lesson.id);
-                    const isCompleted = lessonProgress?.completed;
-                    const previousLesson = lessonIndex > 0 ? module.lessons[lessonIndex - 1] : null;
-                    const isPreviousCompleted = !previousLesson || getLessonProgress(previousLesson.id)?.completed;
-                    const isLocked = lessonIndex > 0 && !isPreviousCompleted;
-
-                    return (
-                      <TouchableOpacity
-                        key={lesson.id}
-                        style={[
-                          styles.lessonItem,
-                          isCompleted && styles.lessonCompleted,
-                          isLocked && styles.lessonLocked,
-                        ]}
-                        onPress={() => !isLocked && navigateToLesson(module, lesson)}
-                        disabled={isLocked}
-                      >
-                        <View style={[styles.lessonNumber, isCompleted && { backgroundColor: module.color }]}>
-                          {isCompleted ? (
-                            <Ionicons name="checkmark" size={16} color="white" />
-                          ) : isLocked ? (
-                            <Ionicons name="lock-closed" size={14} color={Colors.gray400} />
-                          ) : (
-                            <Text style={styles.lessonNumberText}>{lessonIndex + 1}</Text>
-                          )}
-                        </View>
-                        <View style={styles.lessonInfo}>
-                          <Text style={[styles.lessonTitle, isLocked && styles.lessonTitleLocked]}>
-                            {lesson.title}
-                          </Text>
-                          <View style={styles.lessonMeta}>
-                            <Ionicons name="time-outline" size={12} color={Colors.gray400} />
-                            <Text style={styles.lessonDuration}>{lesson.duration}</Text>
-                            <Ionicons name="star-outline" size={12} color={Colors.gray400} style={{ marginLeft: 8 }} />
-                            <Text style={styles.lessonXP}>{lesson.xpReward} XP</Text>
-                          </View>
-                          {lessonProgress?.bestScore !== undefined && lessonProgress.bestScore > 0 && (
-                            <Text style={styles.lessonScore}>Best Quiz: {lessonProgress.bestScore}%</Text>
-                          )}
-                        </View>
-                        <Ionicons
-                          name={isLocked ? "lock-closed" : "chevron-forward"}
-                          size={20}
-                          color={isLocked ? Colors.gray400 : Colors.gray500}
-                        />
-                      </TouchableOpacity>
-                    );
-                  })}
-
-                  {/* Module Exam */}
-                  <TouchableOpacity
-                    style={[
-                      styles.lessonItem,
-                      styles.examItem,
-                      getModuleProgress(module.id)?.examPassed && styles.lessonCompleted,
-                    ]}
-                    onPress={() => {
-                      const examId = getModuleExamId(module.id);
-                      if (examId) navigateToExam(examId);
-                    }}
-                  >
-                    <View style={[styles.lessonNumber, { backgroundColor: module.color }]}>
-                      <Ionicons name="trophy" size={16} color="white" />
-                    </View>
-                    <View style={styles.lessonInfo}>
-                      <Text style={styles.lessonTitle}>Module Exam</Text>
-                      <Text style={styles.lessonDuration}>
-                        {module.finalExam.length} questions
-                      </Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color={Colors.gray500} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-          </>
-        ) : (
-          <>
-            {/* Practice Exams */}
-            <Text style={styles.sectionTitle}>Practice Exams</Text>
-            <Text style={styles.sectionSubtitle}>
-              Test your knowledge with comprehensive assessments
-            </Text>
-
-            {PRACTICE_EXAMS.map((exam) => {
-              const examResult = progress?.examScores.find(e => e.examId === exam.id);
-              return (
-                <TouchableOpacity
-                  key={exam.id}
-                  style={styles.examCard}
-                  onPress={() => navigateToExam(exam.id)}
-                >
-                  <View style={styles.examIconContainer}>
-                    <Ionicons
-                      name={examResult?.passed ? "checkmark-circle" : "clipboard-outline"}
-                      size={32}
-                      color={examResult?.passed ? Colors.success : Colors.primary}
-                    />
-                  </View>
-                  <View style={styles.examInfo}>
-                    <Text style={styles.examTitle}>{exam.title}</Text>
-                    <Text style={styles.examDescription}>{exam.description}</Text>
-                    <View style={styles.examMeta}>
-                      <Ionicons name="time-outline" size={14} color={Colors.gray400} />
-                      <Text style={styles.examMetaText}>{exam.duration}</Text>
-                      <Ionicons name="help-circle-outline" size={14} color={Colors.gray400} style={{ marginLeft: 12 }} />
-                      <Text style={styles.examMetaText}>{exam.totalQuestions}q</Text>
-                      <Ionicons name="ribbon-outline" size={14} color={Colors.gray400} style={{ marginLeft: 12 }} />
-                      <Text style={styles.examMetaText}>{exam.passingScore}%</Text>
-                    </View>
-                    {examResult && (
-                      <View style={[styles.examResultBadge, examResult.passed ? styles.examPassed : styles.examFailed]}>
-                        <Text style={styles.examResultText}>
-                          {examResult.passed ? 'PASSED' : 'RETRY'} - {examResult.score}%
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                  <Ionicons name="chevron-forward" size={24} color={Colors.gray400} />
-                </TouchableOpacity>
-              );
-            })}
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Foundations</Text>
+            {foundationsModules.map(renderModuleCard)}
           </>
         )}
+
+        {/* Social Well-being Section */}
+        {wellbeingModules.length > 0 && (
+          <>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Social Well-being</Text>
+            {wellbeingModules.map(renderModuleCard)}
+          </>
+        )}
+
+        {/* Practice Exams Link */}
+        <TouchableOpacity
+          style={[styles.practiceExamsCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}
+          onPress={() => navigation.navigate('PracticeExam', { examId: PRACTICE_EXAMS[0]?.id })}
+          activeOpacity={0.8}
+        >
+          <View style={styles.practiceExamsIcon}>
+            <Ionicons name="clipboard" size={24} color={Colors.primary} />
+          </View>
+          <View style={styles.practiceExamsContent}>
+            <Text style={[styles.practiceExamsTitle, { color: colors.text }]}>Practice Exams</Text>
+            <Text style={[styles.practiceExamsDescription, { color: colors.textSecondary }]}>
+              Test your knowledge with comprehensive assessments
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
+        </TouchableOpacity>
+
+        {/* Stats Summary */}
+        <View style={[styles.statsCard, { backgroundColor: colors.cardBackground }]}>
+          <View style={styles.statItem}>
+            <Text style={[styles.statNumber, { color: colors.text }]}>{progress?.totalXP || 0}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Total XP</Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statNumber, { color: colors.text }]}>
+              {progress?.lessonsCompleted.filter(l => l.completed).length || 0}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Lessons</Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statNumber, { color: colors.text }]}>{progress?.streakDays || 0}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Day Streak</Text>
+          </View>
+        </View>
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -461,291 +361,146 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  headerSpacer: {
+    width: 44,
+  },
+  headerIconButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    ...Typography.h2,
-    color: 'white',
-  },
-  xpBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 215, 0, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  xpText: {
-    color: '#FFD700',
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  progressSummary: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.lg,
-    gap: 12,
-  },
-  levelCard: {
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 80,
-  },
-  levelLabel: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-  },
-  levelNumber: {
-    color: 'white',
-    fontSize: 32,
+    fontSize: 18,
     fontWeight: '700',
-  },
-  statsCard: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNumber: {
     color: 'white',
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  statLabel: {
-    color: Colors.gray400,
-    fontSize: 11,
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
-    gap: 12,
-  },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    gap: 8,
-  },
-  tabActive: {
-    backgroundColor: 'rgba(99, 102, 241, 0.2)',
-  },
-  tabText: {
-    color: Colors.gray400,
-    fontWeight: '600',
-  },
-  tabTextActive: {
-    color: Colors.primary,
+    letterSpacing: -0.3,
   },
   scrollContent: {
-    paddingHorizontal: Spacing.lg,
-  },
-  moduleCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: BorderRadius.xl,
-    marginBottom: Spacing.lg,
-    overflow: 'hidden',
-  },
-  moduleHeader: {
-    flexDirection: 'row',
     padding: Spacing.lg,
+  },
+  // Daily Tip Card
+  dailyTipCard: {
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  dailyTipHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
   },
-  moduleIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  moduleInfo: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  moduleWeek: {
-    color: 'rgba(255,255,255,0.7)',
+  dailyTipLabel: {
+    color: 'white',
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '700',
+    letterSpacing: 1,
   },
-  moduleTitle: {
+  dailyTipTitle: {
     color: 'white',
     fontSize: 18,
     fontWeight: '700',
-    marginTop: 2,
+    marginBottom: 4,
   },
-  moduleDescription: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 13,
-    marginTop: 4,
-  },
-  moduleProgress: {
-    alignItems: 'center',
-  },
-  progressPercent: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  progressBarContainer: {
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  progressBar: {
-    height: '100%',
-  },
-  lessonsContainer: {
-    padding: Spacing.md,
-  },
-  lessonItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.md,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: BorderRadius.lg,
-    marginBottom: 8,
-  },
-  lessonCompleted: {
-    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-  },
-  lessonLocked: {
-    opacity: 0.5,
-  },
-  examItem: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderStyle: 'dashed',
-  },
-  lessonNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  lessonNumberText: {
-    color: 'white',
-    fontWeight: '600',
-  },
-  lessonInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  lessonTitle: {
-    color: 'white',
+  dailyTipText: {
+    color: 'rgba(255,255,255,0.7)',
     fontSize: 15,
-    fontWeight: '600',
+    lineHeight: 22,
   },
-  lessonTitleLocked: {
-    color: Colors.gray400,
-  },
-  lessonMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  lessonDuration: {
-    color: Colors.gray400,
-    fontSize: 12,
-    marginLeft: 4,
-  },
-  lessonXP: {
-    color: Colors.gray400,
-    fontSize: 12,
-    marginLeft: 4,
-  },
-  lessonScore: {
-    color: Colors.success,
-    fontSize: 12,
-    marginTop: 4,
-  },
+  // Section Title
   sectionTitle: {
     color: 'white',
     fontSize: 22,
     fontWeight: '700',
-    marginBottom: 4,
+    marginBottom: Spacing.md,
+    marginTop: Spacing.md,
+    letterSpacing: -0.3,
   },
-  sectionSubtitle: {
-    color: Colors.gray400,
-    fontSize: 14,
-    marginBottom: Spacing.lg,
-  },
-  examCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+  // Module Card
+  moduleCard: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
-    marginBottom: 12,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
-  examIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+  moduleCardContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.md,
+  },
+  moduleCardLeft: {
+    flex: 1,
+    marginRight: Spacing.md,
+  },
+  moduleCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  moduleIconSmall: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  examInfo: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  examTitle: {
+  moduleCardTitle: {
     color: 'white',
-    fontSize: 17,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
+    flex: 1,
   },
-  examDescription: {
-    color: Colors.gray400,
-    fontSize: 13,
-    marginTop: 4,
+  moduleCardDescription: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 14,
+    lineHeight: 20,
   },
-  examMeta: {
+  moduleCardImage: {
+    width: 80,
+    height: 80,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.gray700,
+  },
+  // Progress Section
+  progressSection: {
+    gap: 8,
+  },
+  progressHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
   },
-  examMetaText: {
-    color: Colors.gray400,
-    fontSize: 12,
-    marginLeft: 4,
-  },
-  examResultBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  examPassed: {
-    backgroundColor: 'rgba(34, 197, 94, 0.2)',
-  },
-  examFailed: {
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
-  },
-  examResultText: {
+  progressLabel: {
+    color: 'rgba(255,255,255,0.5)',
     fontSize: 11,
     fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  progressText: {
     color: 'white',
+    fontSize: 12,
+  },
+  progressBarBg: {
+    height: 8,
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: Colors.primary,
+    borderRadius: 4,
   },
   // Audio Lessons Card
   audioLessonsCard: {
@@ -759,9 +514,9 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
   },
   audioLessonsIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -777,7 +532,7 @@ const styles = StyleSheet.create({
   },
   audioLessonsTitle: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
   },
   newFeatureBadge: {
@@ -795,6 +550,68 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 13,
     marginTop: 4,
+  },
+  // Practice Exams Card
+  practiceExamsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    marginTop: Spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  practiceExamsIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  practiceExamsContent: {
+    flex: 1,
+  },
+  practiceExamsTitle: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  practiceExamsDescription: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    marginTop: 2,
+  },
+  // Stats Card
+  statsCard: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    marginTop: Spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statNumber: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  statLabel: {
+    color: Colors.gray400,
+    fontSize: 12,
+    marginTop: 4,
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
 });
 

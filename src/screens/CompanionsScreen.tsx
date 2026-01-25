@@ -16,6 +16,10 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../constants/theme';
 import MenuModal from '../components/MenuModal';
+import { COMPANIONS } from '../data/companionProfiles';
+import { getLocalImage } from '../data/localImages';
+import { useUser } from '../context/UserContext';
+import { useTheme } from '../hooks/useTheme';
 
 import { API_CONFIG } from '../config/api';
 
@@ -24,6 +28,7 @@ const API_URL = API_CONFIG.API_URL;
 type RootStackParamList = {
   CompanionProfile: { companionId: string };
   Companion: { companionId: string };
+  Chat: { conversationId: string; name: string; avatar?: string; isOnline?: boolean; companionId?: string };
   Call: { companionId: string };
   Matches: undefined;
 };
@@ -45,30 +50,22 @@ const cardHeight = cardWidth * 1.4;
 type FilterType = 'all' | 'female' | 'male';
 
 const CompanionsScreen = () => {
+  const { colors, isDark } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { toggleFavoriteCompanion, isFavoriteCompanion, user } = useUser();
   const [filter, setFilter] = useState<FilterType>('all');
-  const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [companions, setCompanions] = useState<CompanionType[]>([]);
   const [loading, setLoading] = useState(true);
   const [menuVisible, setMenuVisible] = useState(false);
 
-  useEffect(() => {
-    fetchCompanions();
-  }, []);
+  // Track favorites directly to ensure re-renders
+  const favoriteCompanions = user.favoriteCompanions || [];
 
-  const fetchCompanions = async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/companions`);
-      const data = await response.json();
-      setCompanions(data.companions || []);
-    } catch (error) {
-      if (__DEV__) console.error('Error fetching companions:', error);
-      // Use fallback data if API fails
-      setCompanions(fallbackCompanions);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    // Use local companion data directly
+    setCompanions(fallbackCompanions);
+    setLoading(false);
+  }, []);
 
   const getImageUrl = (imagePath: string) => {
     if (imagePath.startsWith('http')) {
@@ -81,22 +78,18 @@ const CompanionsScreen = () => {
     filter === 'all' || c.gender === filter
   );
 
-  const toggleFavorite = (id: string) => {
-    setFavorites(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
-      return newSet;
-    });
+  const getImageSource = (companion: CompanionType) => {
+    const localImage = getLocalImage(companion.id);
+    if (localImage) {
+      return localImage;
+    }
+    return { uri: getImageUrl(companion.profileImage) };
   };
 
   const renderCompanionCard = (companion: CompanionType, index: number) => (
     <View key={companion.id} style={styles.card}>
       <ImageBackground
-        source={{ uri: getImageUrl(companion.profileImage) }}
+        source={getImageSource(companion)}
         style={styles.cardImage}
         imageStyle={styles.cardImageStyle}
       >
@@ -114,12 +107,13 @@ const CompanionsScreen = () => {
           {/* Favorite Button */}
           <TouchableOpacity
             style={styles.favoriteButton}
-            onPress={() => toggleFavorite(companion.id)}
+            onPress={() => toggleFavoriteCompanion(companion.id)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Ionicons
-              name={favorites.has(companion.id) ? 'heart' : 'heart-outline'}
+              name={favoriteCompanions.includes(companion.id) ? 'heart' : 'heart-outline'}
               size={22}
-              color={favorites.has(companion.id) ? Colors.secondary : 'white'}
+              color={favoriteCompanions.includes(companion.id) ? '#FF4B6E' : 'white'}
             />
           </TouchableOpacity>
 
@@ -150,7 +144,12 @@ const CompanionsScreen = () => {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.chatButton}
-              onPress={() => navigation.navigate('Companion', { companionId: companion.id })}
+              onPress={() => navigation.navigate('Chat', {
+                conversationId: companion.id,
+                name: companion.name,
+                isOnline: true,
+                companionId: companion.id,
+              })}
             >
               <Ionicons name="chatbubble" size={18} color="white" />
             </TouchableOpacity>
@@ -162,24 +161,23 @@ const CompanionsScreen = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.loadingContainer} edges={['top']}>
+      <SafeAreaView style={[styles.loadingContainer, { backgroundColor: colors.background }]} edges={['top']}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Loading companions...</Text>
+        <Text style={[styles.loadingText, { color: colors.text }]}>Loading companions...</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerSpacer} />
         <View style={styles.logoContainer}>
-          <Text style={styles.logoTextSpectrum}>Spectrum</Text>
-          <Text style={styles.logoTextConnect}>Connect</Text>
+          <Text style={[styles.logoTextSpectrum, { color: colors.text }]}>Haven</Text>
         </View>
         <TouchableOpacity style={styles.menuButton} onPress={() => setMenuVisible(true)}>
-          <Ionicons name="menu" size={24} color="white" />
+          <Ionicons name="menu" size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -189,26 +187,50 @@ const CompanionsScreen = () => {
       {/* Filter Tabs */}
       <View style={styles.filterContainer}>
         <TouchableOpacity
-          style={[styles.filterTab, filter === 'all' && styles.filterTabActive]}
+          style={[
+            styles.filterTab,
+            { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' },
+            filter === 'all' && styles.filterTabActive
+          ]}
           onPress={() => setFilter('all')}
         >
-          <Text style={[styles.filterText, filter === 'all' && styles.filterTextActive]}>
+          <Text style={[
+            styles.filterText,
+            { color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)' },
+            filter === 'all' && styles.filterTextActive
+          ]}>
             All
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.filterTab, filter === 'female' && styles.filterTabActive]}
+          style={[
+            styles.filterTab,
+            { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' },
+            filter === 'female' && styles.filterTabActive
+          ]}
           onPress={() => setFilter('female')}
         >
-          <Text style={[styles.filterText, filter === 'female' && styles.filterTextActive]}>
+          <Text style={[
+            styles.filterText,
+            { color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)' },
+            filter === 'female' && styles.filterTextActive
+          ]}>
             Women
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.filterTab, filter === 'male' && styles.filterTabActive]}
+          style={[
+            styles.filterTab,
+            { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' },
+            filter === 'male' && styles.filterTabActive
+          ]}
           onPress={() => setFilter('male')}
         >
-          <Text style={[styles.filterText, filter === 'male' && styles.filterTextActive]}>
+          <Text style={[
+            styles.filterText,
+            { color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)' },
+            filter === 'male' && styles.filterTextActive
+          ]}>
             Men
           </Text>
         </TouchableOpacity>
@@ -229,29 +251,27 @@ const CompanionsScreen = () => {
   );
 };
 
-// Fallback data if API fails
-const fallbackCompanions: CompanionType[] = [
-  { id: 'megan', name: 'Megan', age: 25, location: 'Copenhagen', description: '', gender: 'female', profileImage: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=600&fit=crop&crop=face' },
-  { id: 'grace', name: 'Grace', age: 27, location: 'Seoul', description: '', gender: 'female', profileImage: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&h=600&fit=crop&crop=face' },
-  { id: 'julia', name: 'Julia', age: 26, location: 'Beverly Hills', description: '', gender: 'female', profileImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=600&fit=crop&crop=face' },
-  { id: 'bianca', name: 'Bianca', age: 26, location: 'Milan', description: '', gender: 'female', profileImage: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=600&fit=crop&crop=face' },
-  { id: 'julian', name: 'Julian', age: 27, location: 'Florida', description: '', gender: 'male', profileImage: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=600&fit=crop&crop=face' },
-  { id: 'luca', name: 'Luca', age: 27, location: 'Tokyo', description: '', gender: 'male', profileImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop&crop=face' },
-];
+// Use companion profiles from data file
+const fallbackCompanions: CompanionType[] = COMPANIONS.map(c => ({
+  id: c.id,
+  name: c.name,
+  age: c.age,
+  location: c.location,
+  description: c.description,
+  gender: c.gender,
+  profileImage: c.profileImage,
+}));
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1A1A2E',
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#1A1A2E',
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
-    color: 'white',
     marginTop: Spacing.md,
     fontSize: 16,
   },
@@ -278,7 +298,6 @@ const styles = StyleSheet.create({
   logoTextSpectrum: {
     fontSize: 22,
     fontWeight: '700',
-    color: 'white',
     letterSpacing: -0.5,
   },
   logoTextConnect: {
@@ -297,13 +316,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
-    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   filterTabActive: {
     backgroundColor: Colors.primary,
   },
   filterText: {
-    color: 'rgba(255,255,255,0.6)',
     fontWeight: '500',
   },
   filterTextActive: {

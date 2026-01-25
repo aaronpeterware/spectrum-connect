@@ -1,95 +1,163 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, TextInput, Animated, Keyboard } from 'react-native';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, TextInput, Animated, Keyboard, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import MenuModal from '../components/MenuModal';
+import { useUser } from '../context/UserContext';
+import { useTheme } from '../hooks/useTheme';
+import { getMutualMatches, Match } from '../services/matchingService';
+import { supabase } from '../config/supabase';
+import { getUserId } from '../services/profileService';
 
 type RootStackParamList = {
-  Chat: { conversationId: string; name: string; avatar?: string; isOnline?: boolean };
+  Chat: {
+    conversationId: string;
+    name: string;
+    avatar?: string;
+    isOnline?: boolean;
+    recipientId?: string;
+    isFakeUser?: boolean;
+  };
 };
 
-// Direct messages with real users (free messaging)
-const conversations = [
-  {
-    id: '1',
-    name: 'Emma',
-    lastMessage: 'Hey! Nice to match with you 💕',
-    time: 'Just now',
-    unread: true,
-    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200&h=200&fit=crop&crop=face',
-    isOnline: true,
-  },
-  {
-    id: '2',
-    name: 'Sophie',
-    lastMessage: "That sounds fun! I'd love to hear more about it.",
-    time: '1h ago',
-    unread: true,
-    avatar: 'https://images.unsplash.com/photo-1502823403499-6ccfcf4fb453?w=200&h=200&fit=crop&crop=face',
-    isOnline: true,
-  },
-  {
-    id: '3',
-    name: 'Olivia',
-    lastMessage: 'Thanks for the conversation yesterday!',
-    time: '3h ago',
-    unread: false,
-    avatar: 'https://images.unsplash.com/photo-1557555187-23d685287bc3?w=200&h=200&fit=crop&crop=face',
-    isOnline: false,
-  },
-  {
-    id: '4',
-    name: 'Jake',
-    lastMessage: 'Would you like to grab coffee sometime?',
-    time: '5h ago',
-    unread: false,
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop&crop=face',
-    isOnline: true,
-  },
-  {
-    id: '5',
-    name: 'Ava',
-    lastMessage: 'That movie recommendation was perfect!',
-    time: '1d ago',
-    unread: false,
-    avatar: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&h=200&fit=crop&crop=face',
-    isOnline: false,
-  },
-  {
-    id: '6',
-    name: 'Marcus',
-    lastMessage: 'Great meeting you at the event!',
-    time: '2d ago',
-    unread: false,
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face',
-    isOnline: false,
-  },
-  {
-    id: '7',
-    name: 'Rachel',
-    lastMessage: "Let's hang out this weekend!",
-    time: '3d ago',
-    unread: false,
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop&crop=face',
-    isOnline: true,
-  },
-];
+interface ConversationItem {
+  id: string;
+  name: string;
+  lastMessage: string;
+  time: string;
+  unread: boolean;
+  avatar: string;
+  isOnline: boolean;
+  recipientId: string;
+  isFakeUser: boolean;
+}
 
 const MessagesScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { clearUnread } = useUser();
+  const { colors, isDark } = useTheme();
   const [menuVisible, setMenuVisible] = useState(false);
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [conversations, setConversations] = useState<ConversationItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const searchInputRef = useRef<TextInput>(null);
   const searchAnim = useRef(new Animated.Value(0)).current;
 
+  // Format time ago
+  const formatTimeAgo = (dateString: string | undefined): string => {
+    if (!dateString) return 'New match';
+
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  // Load conversations from matching service
+  const loadConversations = useCallback(async () => {
+    try {
+      const matches = await getMutualMatches();
+
+      const convItems: ConversationItem[] = matches.map((match: Match) => ({
+        id: match.conversationId,
+        name: match.profile.name,
+        lastMessage: match.lastMessage || 'Say hello!',
+        time: formatTimeAgo(match.lastMessageAt),
+        unread: match.unreadCount > 0,
+        avatar: match.profile.profilePhotos[0] || '',
+        isOnline: Math.random() > 0.5, // Randomize for now, could track real online status
+        recipientId: match.profile.id,
+        isFakeUser: match.profile.isFake,
+      }));
+
+      setConversations(convItems);
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    loadConversations();
+  }, [loadConversations]);
+
+  // Refresh on focus
+  useFocusEffect(
+    useCallback(() => {
+      clearUnread();
+      loadConversations();
+    }, [clearUnread, loadConversations])
+  );
+
+  // Subscribe to real-time conversation updates
+  useEffect(() => {
+    let subscription: any;
+
+    const setupSubscription = async () => {
+      const userId = await getUserId();
+
+      subscription = supabase
+        .channel('conversations-updates')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'conversations',
+          },
+          (payload) => {
+            // Reload conversations when there's an update
+            loadConversations();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+          },
+          (payload) => {
+            // Reload when new message arrives
+            loadConversations();
+          }
+        )
+        .subscribe();
+    };
+
+    setupSubscription();
+
+    return () => {
+      if (subscription) {
+        supabase.removeChannel(subscription);
+      }
+    };
+  }, [loadConversations]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadConversations();
+  }, [loadConversations]);
+
   const toggleSearch = () => {
     if (searchVisible) {
-      // Close search
       Keyboard.dismiss();
       Animated.timing(searchAnim, {
         toValue: 0,
@@ -100,7 +168,6 @@ const MessagesScreen = () => {
         setSearchQuery('');
       });
     } else {
-      // Open search
       setSearchVisible(true);
       Animated.timing(searchAnim, {
         toValue: 1,
@@ -121,23 +188,23 @@ const MessagesScreen = () => {
     );
   });
 
-  const handleConversationPress = (conversation: typeof conversations[0]) => {
-    // Navigate to Chat screen for direct messages with real users
+  const handleConversationPress = (conversation: ConversationItem) => {
     navigation.navigate('Chat', {
       conversationId: conversation.id,
       name: conversation.name,
       avatar: conversation.avatar,
       isOnline: conversation.isOnline,
+      recipientId: conversation.recipientId,
+      isFakeUser: conversation.isFakeUser,
     });
   };
 
-  const renderConversation = ({ item }: { item: typeof conversations[0] }) => (
+  const renderConversation = ({ item }: { item: ConversationItem }) => (
     <TouchableOpacity
-      style={styles.conversationCard}
+      style={[styles.conversationCard, { backgroundColor: colors.cardBackground }]}
       onPress={() => handleConversationPress(item)}
       activeOpacity={0.7}
     >
-      {/* Avatar */}
       <View style={styles.avatarContainer}>
         {item.avatar ? (
           <Image source={{ uri: item.avatar }} style={styles.avatarImage} />
@@ -149,17 +216,16 @@ const MessagesScreen = () => {
             <Text style={styles.avatarText}>{item.name[0]}</Text>
           </LinearGradient>
         )}
-        {item.isOnline && <View style={styles.onlineIndicator} />}
+        {item.isOnline && <View style={[styles.onlineIndicator, { borderColor: colors.cardBackground }]} />}
       </View>
 
-      {/* Content */}
       <View style={styles.conversationContent}>
         <View style={styles.conversationHeader}>
-          <Text style={styles.conversationName}>{item.name}</Text>
-          <Text style={styles.conversationTime}>{item.time}</Text>
+          <Text style={[styles.conversationName, { color: colors.text }]}>{item.name}</Text>
+          <Text style={[styles.conversationTime, { color: colors.textSecondary }]}>{item.time}</Text>
         </View>
         <Text
-          style={[styles.conversationMessage, item.unread && styles.unreadMessage]}
+          style={[styles.conversationMessage, { color: colors.textSecondary }, item.unread && { color: colors.text, fontWeight: '500' }]}
           numberOfLines={1}
         >
           {item.lastMessage}
@@ -170,16 +236,27 @@ const MessagesScreen = () => {
     </TouchableOpacity>
   );
 
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading conversations...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <MenuModal visible={menuVisible} onClose={() => setMenuVisible(false)} />
 
       <View style={styles.header}>
-        <TouchableOpacity style={styles.searchButton} onPress={toggleSearch}>
-          <Ionicons name={searchVisible ? "close" : "search"} size={22} color={Colors.gray600} />
+        <TouchableOpacity style={[styles.searchButton, { backgroundColor: colors.surface }]} onPress={toggleSearch}>
+          <Ionicons name={searchVisible ? "close" : "search"} size={22} color={colors.textSecondary} />
         </TouchableOpacity>
         {searchVisible ? (
-          <Animated.View style={[styles.searchInputContainer, {
+          <Animated.View style={[styles.searchInputContainer, { backgroundColor: colors.surface }, {
             opacity: searchAnim,
             flex: searchAnim.interpolate({
               inputRange: [0, 1],
@@ -188,9 +265,9 @@ const MessagesScreen = () => {
           }]}>
             <TextInput
               ref={searchInputRef}
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: colors.text }]}
               placeholder="Search messages..."
-              placeholderTextColor={Colors.gray400}
+              placeholderTextColor={colors.textSecondary}
               value={searchQuery}
               onChangeText={setSearchQuery}
               autoCapitalize="none"
@@ -198,18 +275,17 @@ const MessagesScreen = () => {
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
-                <Ionicons name="close-circle" size={18} color={Colors.gray400} />
+                <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
               </TouchableOpacity>
             )}
           </Animated.View>
         ) : (
           <View style={styles.logoContainer}>
-            <Text style={styles.logoTextSpectrum}>Spectrum</Text>
-            <Text style={styles.logoTextConnect}>Connect</Text>
+            <Text style={[styles.logoTextSpectrum, { color: colors.text }]}>Messages</Text>
           </View>
         )}
         <TouchableOpacity style={styles.menuButton} onPress={() => setMenuVisible(true)}>
-          <Ionicons name="menu" size={24} color={Colors.gray900} />
+          <Ionicons name="menu" size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -219,11 +295,23 @@ const MessagesScreen = () => {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.primary}
+            colors={[Colors.primary]}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="chatbubbles-outline" size={48} color={Colors.gray300} />
-            <Text style={styles.emptyText}>No messages found</Text>
-            <Text style={styles.emptySubtext}>Try a different search term</Text>
+            <Ionicons name="chatbubbles-outline" size={48} color={colors.textSecondary} />
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              {searchQuery ? 'No messages found' : 'No matches yet'}
+            </Text>
+            <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+              {searchQuery ? 'Try a different search term' : 'Start swiping to find matches!'}
+            </Text>
           </View>
         }
       />
@@ -235,6 +323,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.gray50,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    ...Typography.bodySmall,
+    color: Colors.gray500,
+    marginTop: Spacing.md,
   },
   header: {
     flexDirection: 'row',
@@ -313,40 +411,9 @@ const styles = StyleSheet.create({
     color: Colors.gray400,
     marginTop: Spacing.xs,
   },
-  coachCard: {
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.lg,
-    borderRadius: BorderRadius.xl,
-    overflow: 'hidden',
-  },
-  coachCardGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.lg,
-  },
-  coachIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.md,
-  },
-  coachInfo: {
-    flex: 1,
-  },
-  coachTitle: {
-    ...Typography.body,
-    fontWeight: '600',
-    color: 'white',
-  },
-  coachSubtitle: {
-    ...Typography.bodySmall,
-    color: 'rgba(255,255,255,0.8)',
-  },
   list: {
     paddingHorizontal: Spacing.lg,
+    flexGrow: 1,
   },
   conversationCard: {
     flexDirection: 'row',
@@ -391,19 +458,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#22C55E',
     borderWidth: 2,
     borderColor: Colors.surface,
-  },
-  nameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  coachBadge: {
-    backgroundColor: Colors.primary,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   conversationContent: {
     flex: 1,

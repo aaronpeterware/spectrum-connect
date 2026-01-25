@@ -1,0 +1,55 @@
+{
+  "scenarioId": "audio_1_3",
+  "title": "Mixed Signals on a Date",
+  "segments": [
+    {
+      "index": 0,
+      "speaker": "Casey",
+      "filename": "segment_00.mp3",
+      "text": "So this place came highly recommended. Have you been here before?"
+    },
+    {
+      "index": 1,
+      "speaker": "Riley",
+      "filename": "segment_01.mp3",
+      "text": "No, first time! It's really nice though. Um, I hope I'm not underdressed."
+    },
+    {
+      "index": 2,
+      "speaker": "Casey",
+      "filename": "segment_02.mp3",
+      "text": "You look great, don't worry. So, you mentioned you work in design?"
+    },
+    {
+      "index": 3,
+      "speaker": "Riley",
+      "filename": "segment_03.mp3",
+      "text": "Yeah! I'm a UX designer. It's um, it's really fun actually. I get to solve puzzles all day basically. Sorry, I'm rambling."
+    },
+    {
+      "index": 4,
+      "speaker": "Casey",
+      "filename": "segment_04.mp3",
+      "text": "No, I love it! Tell me more. What kind of puzzles?"
+    },
+    {
+      "index": 5,
+      "speaker": "Riley",
+      "filename": "segment_05.mp3",
+      "text": "Well like... okay so imagine someone's trying to buy something online and they can't find the checkout button. My job is to figure out why and fix it. Make it intuitive."
+    },
+    {
+      "index": 6,
+      "speaker": "Casey",
+      "filename": "segment_06.mp3",
+      "text": "That's actually really cool. I bet you notice bad design everywhere now."
+    },
+    {
+      "index": 7,
+      "speaker": "Riley",
+      "filename": "segment_07.mp3",
+      "text": "Oh my god, yes. It's a curse. I can't use an app without mentally redesigning it. Anyway, what about you? What's your day-to-day like?"
+    }
+  ],
+  "generatedAt": "2026-01-21T03:33:28.805Z"
+}

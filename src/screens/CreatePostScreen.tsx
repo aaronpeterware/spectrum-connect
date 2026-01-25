@@ -6,7 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Alert,
   Modal,
   FlatList,
   Image,
@@ -96,21 +95,8 @@ const CreatePostScreen = () => {
       user.profileImage
     );
 
-    // Show success and notify tagged users
-    const tagMessage = taggedUsers.length > 0
-      ? `\n\nNotifications sent to: ${taggedUsers.map(u => u.name).join(', ')}`
-      : '';
-
-    Alert.alert(
-      'Post Created!',
-      `Your post has been shared with the community.${tagMessage}`,
-      [
-        {
-          text: 'OK',
-          onPress: () => navigation.goBack(),
-        },
-      ]
-    );
+    // Navigate back immediately after posting
+    navigation.goBack();
   };
 
   const handleContentChange = useCallback((text: string) => {

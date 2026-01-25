@@ -64,7 +64,7 @@ export const COMMUNITY_USERS: CommunityUser[] = [
     age: 24,
     gender: 'female',
     location: 'Melbourne, VIC',
-    profileImage: 'https://randomuser.me/api/portraits/women/32.jpg',
+    profileImage: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop&crop=face',
     bio: 'Late-diagnosed at 22. Finally understanding myself! Love cats, crochet, and cozy games like Stardew Valley. Working on putting myself out there more.',
     interests: ['Crafts', 'Video games', 'Cats', 'True crime podcasts'],
     autismRelated: {
@@ -82,7 +82,7 @@ export const COMMUNITY_USERS: CommunityUser[] = [
     age: 28,
     gender: 'male',
     location: 'Sydney, NSW',
-    profileImage: 'https://randomuser.me/api/portraits/men/22.jpg',
+    profileImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=face',
     bio: 'Train enthusiast and IT support tech. Diagnosed as a kid. Here to learn dating skills and maybe meet someone who gets me. I know way too much about Sydney\'s rail history.',
     interests: ['Trains', 'Technology', 'History', 'Model building'],
     autismRelated: {
@@ -100,7 +100,7 @@ export const COMMUNITY_USERS: CommunityUser[] = [
     age: 26,
     gender: 'female',
     location: 'Brisbane, QLD',
-    profileImage: 'https://randomuser.me/api/portraits/women/44.jpg',
+    profileImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=face',
     bio: 'Librarian by day, fantasy novel reader by night. Exploring the dating world after a few years of focusing on myself. Looking for someone who appreciates quiet evenings.',
     interests: ['Books', 'Fantasy', 'Board games', 'Tea'],
     autismRelated: {
@@ -118,7 +118,7 @@ export const COMMUNITY_USERS: CommunityUser[] = [
     age: 31,
     gender: 'male',
     location: 'Perth, WA',
-    profileImage: 'https://randomuser.me/api/portraits/men/45.jpg',
+    profileImage: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop&crop=face',
     bio: 'Musician and sound engineer. Got diagnosed at 29 - life makes so much more sense now! Learning that being myself is actually attractive, who knew?',
     interests: ['Music production', 'Guitar', 'Vinyl records', 'Coffee'],
     autismRelated: {
@@ -136,7 +136,7 @@ export const COMMUNITY_USERS: CommunityUser[] = [
     age: 23,
     gender: 'female',
     location: 'Adelaide, SA',
-    profileImage: 'https://randomuser.me/api/portraits/women/67.jpg',
+    profileImage: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop&crop=face',
     bio: 'Art student specialising in digital illustration. Proudly autistic! I draw comics about neurodivergent experiences. Dating apps are scary but I\'m trying!',
     interests: ['Digital art', 'Comics', 'Anime', 'Japanese culture'],
     autismRelated: {
@@ -154,7 +154,7 @@ export const COMMUNITY_USERS: CommunityUser[] = [
     age: 27,
     gender: 'male',
     location: 'Gold Coast, QLD',
-    profileImage: 'https://randomuser.me/api/portraits/men/67.jpg',
+    profileImage: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop&crop=face',
     bio: 'Marine biologist working on reef conservation. Nature is my happy place. Working on being more social - this app has really helped! Looking for someone who loves the ocean.',
     interests: ['Marine life', 'Scuba diving', 'Photography', 'Documentaries'],
     autismRelated: {
@@ -172,7 +172,7 @@ export const COMMUNITY_USERS: CommunityUser[] = [
     age: 29,
     gender: 'female',
     location: 'Hobart, TAS',
-    profileImage: 'https://randomuser.me/api/portraits/women/55.jpg',
+    profileImage: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&h=200&fit=crop&crop=face',
     bio: 'Accountant who actually loves spreadsheets (stereotype alert!). Self-diagnosed, seeking formal diagnosis. The dating lessons here have been eye-opening.',
     interests: ['Puzzles', 'Hiking', 'Numbers', 'Baking'],
     autismRelated: {
@@ -190,7 +190,7 @@ export const COMMUNITY_USERS: CommunityUser[] = [
     age: 25,
     gender: 'male',
     location: 'Canberra, ACT',
-    profileImage: 'https://randomuser.me/api/portraits/men/32.jpg',
+    profileImage: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&h=200&fit=crop&crop=face',
     bio: 'Software developer and retro gaming collector. Diagnosed at 8. Had my first real date last month thanks to practicing here! It didn\'t lead anywhere but I\'m proud I tried.',
     interests: ['Retro games', 'Coding', 'Mechanical keyboards', 'Sci-fi'],
     autismRelated: {
@@ -208,7 +208,7 @@ export const COMMUNITY_USERS: CommunityUser[] = [
     age: 22,
     gender: 'female',
     location: 'Newcastle, NSW',
-    profileImage: 'https://randomuser.me/api/portraits/women/21.jpg',
+    profileImage: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&h=200&fit=crop&crop=face',
     bio: 'Psychology student interested in neurodiversity research. Want to help others like me! Here to practice social skills and maybe find someone special.',
     interests: ['Psychology', 'Reading', 'Yoga', 'Journaling'],
     autismRelated: {
@@ -226,7 +226,7 @@ export const COMMUNITY_USERS: CommunityUser[] = [
     age: 30,
     gender: 'male',
     location: 'Geelong, VIC',
-    profileImage: 'https://randomuser.me/api/portraits/men/55.jpg',
+    profileImage: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=200&h=200&fit=crop&crop=face',
     bio: 'Chef who turned a special interest into a career! Food is my love language. Learning that dating doesn\'t have to be dinner at a fancy restaurant - low pressure is okay.',
     interests: ['Cooking', 'Food science', 'Farmers markets', 'Football'],
     autismRelated: {

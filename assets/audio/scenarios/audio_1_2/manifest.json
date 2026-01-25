@@ -1,0 +1,55 @@
+{
+  "scenarioId": "audio_1_2",
+  "title": "The Polite Exit",
+  "segments": [
+    {
+      "index": 0,
+      "speaker": "Taylor",
+      "filename": "segment_00.mp3",
+      "text": "So yeah, our Q3 projections are really exciting. We're looking at a 40% increase in user engagement."
+    },
+    {
+      "index": 1,
+      "speaker": "Morgan",
+      "filename": "segment_01.mp3",
+      "text": "Oh, that's... that's great."
+    },
+    {
+      "index": 2,
+      "speaker": "Taylor",
+      "filename": "segment_02.mp3",
+      "text": "Yeah! And the best part is we're rolling out this new feature that I've been working on for months-"
+    },
+    {
+      "index": 3,
+      "speaker": "Morgan",
+      "filename": "segment_03.mp3",
+      "text": "Mm-hmm."
+    },
+    {
+      "index": 4,
+      "speaker": "Taylor",
+      "filename": "segment_04.mp3",
+      "text": "It uses machine learning to personalize the entire experience. I can tell you all about the technical architecture if you're interested!"
+    },
+    {
+      "index": 5,
+      "speaker": "Morgan",
+      "filename": "segment_05.mp3",
+      "text": "Yeah, um, that sounds interesting. Hey, I actually need to go say hi to someone I just spotted. But it was nice chatting!"
+    },
+    {
+      "index": 6,
+      "speaker": "Taylor",
+      "filename": "segment_06.mp3",
+      "text": "Oh! Sure, no problem. Maybe we can connect on LinkedIn and I can send you more details?"
+    },
+    {
+      "index": 7,
+      "speaker": "Morgan",
+      "filename": "segment_07.mp3",
+      "text": "Sure, sounds good. Have a good night!"
+    }
+  ],
+  "generatedAt": "2026-01-21T03:33:20.909Z"
+}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,14 +7,38 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
+import { FAKE_PROFILES } from '../data/fakeProfiles';
+import { supabase } from '../config/supabase';
+import { getUserId } from '../services/profileService';
 
 const { width } = Dimensions.get('window');
+
+type RootStackParamList = {
+  UserProfile: {
+    userId: string;
+    name: string;
+    avatar?: string;
+  };
+  Chat: {
+    conversationId: string;
+    name: string;
+    avatar?: string;
+    isOnline?: boolean;
+    recipientId?: string;
+    isFakeUser?: boolean;
+  };
+  Profile: undefined;
+};
 
 type RouteParams = {
   UserProfile: {
@@ -23,6 +47,9 @@ type RouteParams = {
     avatar?: string;
   };
 };
+
+// Storage key for followed users
+const FOLLOWED_USERS_KEY = 'followed_users';
 
 // Sample user data - in a real app this would come from an API
 const userData: Record<string, {
@@ -88,12 +115,44 @@ const userData: Record<string, {
 };
 
 const UserProfileScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RouteParams, 'UserProfile'>>();
   const { userId, name, avatar } = route.params;
+  const [isOwnProfile, setIsOwnProfile] = useState(false);
 
-  // Get user data or create a fallback
-  const user = userData[userId] || {
+  // Check if user is viewing their own profile
+  useEffect(() => {
+    const checkOwnProfile = async () => {
+      try {
+        const currentUserId = await getUserId();
+        if (currentUserId === userId) {
+          setIsOwnProfile(true);
+          // Redirect to their own profile screen
+          navigation.replace('Profile');
+        }
+      } catch (error) {
+        console.log('Error checking own profile:', error);
+      }
+    };
+    checkOwnProfile();
+  }, [userId, navigation]);
+
+  // Check if this is a fake profile first
+  const fakeProfile = FAKE_PROFILES.find(p => p.id === userId);
+
+  // Get user data - check fake profiles, then hardcoded data, then fallback
+  const user = fakeProfile ? {
+    name: fakeProfile.name,
+    age: fakeProfile.age,
+    location: fakeProfile.location,
+    bio: fakeProfile.bio,
+    avatar: fakeProfile.profilePhotos[0] || avatar || '',
+    interests: fakeProfile.interests,
+    joinedDate: 'Recently',
+    postsCount: Math.floor(Math.random() * 20),
+    connectionsCount: Math.floor(Math.random() * 100) + 50,
+    isVerified: true,
+  } : userData[userId] || {
     name: name,
     age: 25,
     location: 'Unknown',
@@ -107,6 +166,118 @@ const UserProfileScreen = () => {
   };
 
   const [isFollowing, setIsFollowing] = useState(false);
+
+  // Load follow state on mount
+  useEffect(() => {
+    const loadFollowState = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(FOLLOWED_USERS_KEY);
+        if (stored) {
+          const followedUsers: string[] = JSON.parse(stored);
+          setIsFollowing(followedUsers.includes(userId));
+        }
+      } catch (error) {
+        console.log('Error loading follow state:', error);
+      }
+    };
+    loadFollowState();
+  }, [userId]);
+
+  // Handle follow/unfollow
+  const handleFollowToggle = async () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      const stored = await AsyncStorage.getItem(FOLLOWED_USERS_KEY);
+      let followedUsers: string[] = stored ? JSON.parse(stored) : [];
+
+      if (isFollowing) {
+        // Unfollow
+        followedUsers = followedUsers.filter(id => id !== userId);
+        setIsFollowing(false);
+      } else {
+        // Follow
+        followedUsers.push(userId);
+        setIsFollowing(true);
+        // Show confirmation
+        Alert.alert(
+          'Following!',
+          `You'll be notified when ${user.name} posts something new.`,
+          [{ text: 'OK' }]
+        );
+      }
+
+      await AsyncStorage.setItem(FOLLOWED_USERS_KEY, JSON.stringify(followedUsers));
+    } catch (error) {
+      console.log('Error toggling follow:', error);
+    }
+  };
+
+  // Handle message button - find existing conversation or create new one
+  const handleMessage = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    try {
+      const currentUserId = await getUserId();
+      const isFakeUser = !!fakeProfile;
+
+      // Look for existing conversation with this user
+      const { data: existingConv } = await supabase
+        .from('conversations')
+        .select('id')
+        .or(`and(participant_1_id.eq.${currentUserId},participant_2_id.eq.${userId}),and(participant_1_id.eq.${userId},participant_2_id.eq.${currentUserId})`)
+        .single();
+
+      if (existingConv) {
+        // Navigate to existing conversation
+        navigation.navigate('Chat', {
+          conversationId: existingConv.id,
+          name: user.name,
+          avatar: user.avatar,
+          isOnline: true,
+          recipientId: userId,
+          isFakeUser,
+        });
+      } else {
+        // Create new conversation
+        const { data: newConv } = await supabase
+          .from('conversations')
+          .insert({
+            participant_1_id: currentUserId,
+            participant_2_id: userId,
+          })
+          .select('id')
+          .single();
+
+        if (newConv) {
+          navigation.navigate('Chat', {
+            conversationId: newConv.id,
+            name: user.name,
+            avatar: user.avatar,
+            isOnline: true,
+            recipientId: userId,
+            isFakeUser,
+          });
+        }
+      }
+    } catch (error) {
+      console.log('Error finding/creating conversation:', error);
+      // Fallback - just navigate with userId as conversationId
+      navigation.navigate('Chat', {
+        conversationId: userId,
+        name: user.name,
+        avatar: user.avatar,
+        isOnline: true,
+        recipientId: userId,
+        isFakeUser: !!fakeProfile,
+      });
+    }
+  };
+
+  // Don't render if redirecting to own profile
+  if (isOwnProfile) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>
@@ -165,7 +336,7 @@ const UserProfileScreen = () => {
           <View style={styles.actionButtons}>
             <TouchableOpacity
               style={[styles.followButton, isFollowing && styles.followingButton]}
-              onPress={() => setIsFollowing(!isFollowing)}
+              onPress={handleFollowToggle}
             >
               <LinearGradient
                 colors={isFollowing ? [Colors.gray200, Colors.gray200] : [Colors.gradientPink, Colors.gradientPurple]}
@@ -182,7 +353,7 @@ const UserProfileScreen = () => {
               </LinearGradient>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.messageButton}>
+            <TouchableOpacity style={styles.messageButton} onPress={handleMessage}>
               <Ionicons name="chatbubble-outline" size={20} color={Colors.primary} />
               <Text style={styles.messageText}>Message</Text>
             </TouchableOpacity>

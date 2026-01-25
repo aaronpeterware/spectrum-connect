@@ -1,0 +1,30 @@
+{
+  "generatedAt": "2026-01-21T03:33:48.883Z",
+  "scenarios": [
+    {
+      "id": "audio_1_1",
+      "title": "The Coffee Shop Connection",
+      "segmentCount": 10
+    },
+    {
+      "id": "audio_1_2",
+      "title": "The Polite Exit",
+      "segmentCount": 8
+    },
+    {
+      "id": "audio_1_3",
+      "title": "Mixed Signals on a Date",
+      "segmentCount": 8
+    },
+    {
+      "id": "audio_2_1",
+      "title": "The Enthusiastic Yes vs. The Polite Yes",
+      "segmentCount": 6
+    },
+    {
+      "id": "audio_2_2",
+      "title": "Detecting Discomfort",
+      "segmentCount": 6
+    }
+  ]
+}

@@ -340,7 +340,6 @@ const styles = StyleSheet.create({
   scenariosContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
     padding: Spacing.md,
-    paddingTop: 0,
     marginTop: -BorderRadius.xl,
     paddingTop: BorderRadius.xl + Spacing.md,
     borderBottomLeftRadius: BorderRadius.xl,

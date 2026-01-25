@@ -121,7 +121,7 @@ const PostDetailScreen = () => {
   const { postId } = route.params;
 
   const { posts, toggleLike, getComments, addComment, toggleCommentLike } = usePosts();
-  const { user } = useUser();
+  const { user, userId: currentUserId } = useUser();
   const post = posts.find(p => p.id === postId);
 
   const [newComment, setNewComment] = useState('');
@@ -176,8 +176,13 @@ const PostDetailScreen = () => {
     setNewComment(`@${author} `);
   };
 
-  const handleProfilePress = (userId: string, name: string, avatar: string) => {
-    navigation.navigate('UserProfile', { userId, name, avatar });
+  const handleProfilePress = (targetUserId: string, name: string, avatar: string) => {
+    // Don't navigate if clicking on own profile
+    if (targetUserId === currentUserId) {
+      navigation.navigate('Profile' as never);
+      return;
+    }
+    navigation.navigate('UserProfile', { userId: targetUserId, name, avatar });
   };
 
   // Organize comments into threaded structure

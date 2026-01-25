@@ -1,4 +1,4 @@
-// Spectrum Connect Classroom - Lesson Data
+// Haven Classroom - Lesson Data
 // Comprehensive learning modules with audio scenarios, quizzes, and practice exams
 
 export interface QuizQuestion {

@@ -1,25 +1,30 @@
 {
   "expo": {
-    "name": "Spectrum Connect",
+    "name": "Haven",
     "slug": "spectrum-connect",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "scheme": "spectrumconnect",
+    "scheme": "havenapp",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#F8FAFC"
     },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#7C3AED",
+      "iosDisplayInForeground": true
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.aaronware.spectrumconnect",
       "infoPlist": {
-        "NSCameraUsageDescription": "Spectrum Connect needs camera access to take profile photos and share moments.",
-        "NSPhotoLibraryUsageDescription": "Spectrum Connect needs photo library access to select profile photos.",
-        "NSMicrophoneUsageDescription": "Spectrum Connect needs microphone access for voice conversations with AI companions.",
+        "NSCameraUsageDescription": "Haven needs camera access to let you take profile photos. When you tap 'Take Photo' during profile setup or editing, your camera opens so you can capture a new picture of yourself to share with potential matches.",
+        "NSPhotoLibraryUsageDescription": "Haven needs photo library access to let you select profile pictures. When you tap 'Choose from Library' during profile setup or editing, you can pick existing photos from your library to add to your dating profile (up to 6 photos).",
+        "NSMicrophoneUsageDescription": "Haven needs microphone access for voice calls with companions. When you tap the call button on a companion's profile, your microphone is used so they can hear you during the real-time voice conversation.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -28,7 +33,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#F8FAFC"
       },
-      "package": "com.aaronware.spectrumconnect",
+      "package": "com.aaronware.havenapp",
       "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.CAMERA",
@@ -41,15 +46,22 @@
     },
     "plugins": [
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#7C3AED"
+        }
+      ],
+      [
         "expo-camera",
         {
-          "cameraPermission": "Allow Spectrum Connect to access your camera for photos."
+          "cameraPermission": "Haven needs camera access to let you take profile photos. When you tap 'Take Photo' during profile setup or editing, your camera opens so you can capture a new picture of yourself to share with potential matches."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Spectrum Connect to access your photos."
+          "photosPermission": "Haven needs photo library access to let you select profile pictures. When you tap 'Choose from Library' during profile setup or editing, you can pick existing photos from your library to add to your dating profile (up to 6 photos)."
         }
       ]
     ],

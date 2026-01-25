@@ -1,16 +1,17 @@
-export const Colors = {
-  // Brand colors from logo gradient
-  primary: '#8B5CF6',      // Purple
+// Light theme colors
+export const LightColors = {
+  // Brand colors
+  primary: '#8B5CF6',
   primaryLight: '#A78BFA',
   primaryDark: '#7C3AED',
-  secondary: '#EC4899',    // Pink
+  secondary: '#EC4899',
   secondaryLight: '#F472B6',
-  accent: '#2DD4BF',       // Mint/Teal
+  accent: '#2DD4BF',
   accentLight: '#5EEAD4',
-  blue: '#3B82F6',         // Blue
+  blue: '#3B82F6',
   blueLight: '#60A5FA',
 
-  // Gradient stops (for matching logo)
+  // Gradient stops
   gradientPink: '#E879F9',
   gradientPurple: '#8B5CF6',
   gradientBlue: '#3B82F6',
@@ -33,10 +34,26 @@ export const Colors = {
   gray800: '#1E293B',
   gray900: '#0F172A',
 
-  // Backgrounds
+  // Semantic colors
   background: '#F5F5F5',
   surface: '#FFFFFF',
+  surfaceSecondary: '#F8FAFC',
+  text: '#0F172A',
+  textSecondary: '#64748B',
+  textTertiary: '#94A3B8',
+  border: '#E2E8F0',
+  divider: '#F1F5F9',
   dark: '#1A1A2E',
+
+  // Card colors
+  cardBackground: '#FFFFFF',
+  cardBorder: '#E2E8F0',
+
+  // Input colors
+  inputBackground: '#FFFFFF',
+  inputBorder: '#E2E8F0',
+  inputText: '#0F172A',
+  inputPlaceholder: '#94A3B8',
 
   // AI State colors
   aiOnline: '#10B981',
@@ -44,6 +61,76 @@ export const Colors = {
   aiSpeaking: '#7C3AED',
   aiListening: '#3B82F6',
 };
+
+// Dark theme colors
+export const DarkColors = {
+  // Brand colors (same as light)
+  primary: '#A78BFA',
+  primaryLight: '#C4B5FD',
+  primaryDark: '#8B5CF6',
+  secondary: '#F472B6',
+  secondaryLight: '#F9A8D4',
+  accent: '#5EEAD4',
+  accentLight: '#99F6E4',
+  blue: '#60A5FA',
+  blueLight: '#93C5FD',
+
+  // Gradient stops
+  gradientPink: '#F0ABFC',
+  gradientPurple: '#A78BFA',
+  gradientBlue: '#60A5FA',
+  gradientMint: '#5EEAD4',
+
+  // Status colors
+  success: '#34D399',
+  warning: '#FBBF24',
+  error: '#F87171',
+
+  // Grays (inverted)
+  gray50: '#0F172A',
+  gray100: '#1E293B',
+  gray200: '#334155',
+  gray300: '#475569',
+  gray400: '#64748B',
+  gray500: '#94A3B8',
+  gray600: '#CBD5E1',
+  gray700: '#E2E8F0',
+  gray800: '#F1F5F9',
+  gray900: '#F8FAFC',
+
+  // Semantic colors
+  background: '#0F172A',
+  surface: '#1E293B',
+  surfaceSecondary: '#334155',
+  text: '#F8FAFC',
+  textSecondary: '#CBD5E1',
+  textTertiary: '#94A3B8',
+  border: '#334155',
+  divider: '#1E293B',
+  dark: '#0F172A',
+
+  // Card colors
+  cardBackground: '#1E293B',
+  cardBorder: '#334155',
+
+  // Input colors
+  inputBackground: '#334155',
+  inputBorder: '#475569',
+  inputText: '#F8FAFC',
+  inputPlaceholder: '#94A3B8',
+
+  // AI State colors
+  aiOnline: '#34D399',
+  aiThinking: '#FBBF24',
+  aiSpeaking: '#A78BFA',
+  aiListening: '#60A5FA',
+};
+
+// Default export for backwards compatibility (light theme)
+export const Colors = LightColors;
+
+// Theme type
+export type ThemeColors = typeof LightColors;
 
 export const Spacing = {
   xs: 4,

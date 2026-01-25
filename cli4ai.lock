@@ -1,0 +1,15 @@
+{
+  "lockfileVersion": 1,
+  "packages": {
+    "nanobanana": {
+      "name": "nanobanana",
+      "version": "1.0.17",
+      "resolved": "/Users/aaronware/spectrum-connect-start/spectrum-app/.cli4ai/packages/nanobanana"
+    },
+    "chrome": {
+      "name": "chrome",
+      "version": "1.1.4",
+      "resolved": "/Users/aaronware/spectrum-connect-start/spectrum-app/.cli4ai/packages/chrome"
+    }
+  }
+}

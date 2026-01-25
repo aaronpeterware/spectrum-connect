@@ -42,8 +42,7 @@ const MenuModal: React.FC<MenuModalProps> = ({ visible, onClose }) => {
         <View style={styles.menuPanel}>
           <View style={styles.menuHeader}>
             <View style={styles.menuLogoContainer}>
-              <Text style={styles.menuLogoSpectrum}>Spectrum</Text>
-              <Text style={styles.menuLogoConnect}>Connect</Text>
+              <Text style={styles.menuLogoSpectrum}>Haven</Text>
             </View>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Ionicons name="close" size={24} color="white" />
@@ -56,7 +55,7 @@ const MenuModal: React.FC<MenuModalProps> = ({ visible, onClose }) => {
               <Text style={styles.menuItemText}>Home</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.menuItem} onPress={() => goToTab('Companions')}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => goToScreen('Companions')}>
               <Ionicons name="heart-circle-outline" size={22} color="white" />
               <Text style={styles.menuItemText}>Companions</Text>
             </TouchableOpacity>

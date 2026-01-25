@@ -44,7 +44,7 @@ const HomeScreen = () => {
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>Welcome back!</Text>
-            <Text style={styles.title}>Spectrum Connect</Text>
+            <Text style={styles.title}>Haven</Text>
           </View>
           <TouchableOpacity style={styles.profileButton}>
             <LinearGradient

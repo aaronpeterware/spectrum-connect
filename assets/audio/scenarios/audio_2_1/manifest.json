@@ -1,0 +1,43 @@
+{
+  "scenarioId": "audio_2_1",
+  "title": "The Enthusiastic Yes vs. The Polite Yes",
+  "segments": [
+    {
+      "index": 0,
+      "speaker": "Friend A",
+      "filename": "segment_00.mp3",
+      "text": "Hey, want to come to my birthday party next Saturday?"
+    },
+    {
+      "index": 1,
+      "speaker": "Friend B - Enthusiastic",
+      "filename": "segment_01.mp3",
+      "text": "Oh my gosh, yes! I wouldn't miss it. What time should I be there? Can I bring anything?"
+    },
+    {
+      "index": 2,
+      "speaker": "Narrator",
+      "filename": "segment_02.mp3",
+      "text": "Now listen to the same question with a different response."
+    },
+    {
+      "index": 3,
+      "speaker": "Friend A",
+      "filename": "segment_03.mp3",
+      "text": "Hey, want to come to my birthday party next Saturday?"
+    },
+    {
+      "index": 4,
+      "speaker": "Friend B - Polite",
+      "filename": "segment_04.mp3",
+      "text": "Oh, um, yeah sure, I'll try to make it. What time is it?"
+    },
+    {
+      "index": 5,
+      "speaker": "Narrator",
+      "filename": "segment_05.mp3",
+      "text": "Notice the difference? Let's break it down."
+    }
+  ],
+  "generatedAt": "2026-01-21T03:33:37.408Z"
+}

@@ -1,0 +1,137 @@
+{
+  "name": "chrome",
+  "version": "1.1.4",
+  "description": "Chrome browser automation with managed browser instance",
+  "author": "cliforai",
+  "license": "BUSL-1.1",
+  "entry": "dist/run.js",
+  "runtime": "node",
+  "keywords": [
+    "chrome",
+    "browser",
+    "puppeteer",
+    "automation",
+    "headless"
+  ],
+  "commands": {
+    "launch": {
+      "description": "Launch managed browser",
+      "args": []
+    },
+    "close": {
+      "description": "Close managed browser",
+      "args": []
+    },
+    "status": {
+      "description": "Check browser status",
+      "args": []
+    },
+    "navigate": {
+      "description": "Open URL in browser",
+      "args": [
+        {
+          "name": "url",
+          "required": true
+        }
+      ]
+    },
+    "click": {
+      "description": "Click an element",
+      "args": [
+        {
+          "name": "selector",
+          "required": true
+        }
+      ]
+    },
+    "type": {
+      "description": "Type text into an input",
+      "args": [
+        {
+          "name": "selector",
+          "required": true
+        },
+        {
+          "name": "text",
+          "required": true
+        }
+      ]
+    },
+    "eval": {
+      "description": "Run JavaScript in page context",
+      "args": [
+        {
+          "name": "script",
+          "required": true
+        }
+      ]
+    },
+    "screenshot": {
+      "description": "Capture screenshot",
+      "args": [
+        {
+          "name": "output",
+          "required": false
+        }
+      ]
+    },
+    "pdf": {
+      "description": "Save page as PDF",
+      "args": [
+        {
+          "name": "output",
+          "required": false
+        }
+      ]
+    },
+    "cookies": {
+      "description": "Get cookies",
+      "args": [
+        {
+          "name": "domain",
+          "required": false
+        }
+      ]
+    },
+    "html": {
+      "description": "Get page HTML",
+      "args": [
+        {
+          "name": "selector",
+          "required": false
+        }
+      ]
+    },
+    "text": {
+      "description": "Get text content",
+      "args": [
+        {
+          "name": "selector",
+          "required": false
+        }
+      ]
+    },
+    "wait": {
+      "description": "Wait for element",
+      "args": [
+        {
+          "name": "selector",
+          "required": true
+        }
+      ]
+    },
+    "tabs": {
+      "description": "List open tabs",
+      "args": []
+    }
+  },
+  "dependencies": {
+    "@cli4ai/lib": "^1.0.9",
+    "puppeteer": "^24.0.0",
+    "commander": "^14.0.0"
+  },
+  "mcp": {
+    "enabled": true,
+    "transport": "stdio"
+  }
+}
