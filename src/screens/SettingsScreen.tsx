@@ -13,7 +13,6 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -66,11 +65,10 @@ const SettingsScreen = () => {
     loadPushToken();
   }, []);
 
-  const handleCopyToken = async () => {
+  const handleCopyToken = () => {
     if (pushToken) {
-      await Clipboard.setStringAsync(pushToken);
       triggerHaptic('success');
-      Alert.alert('Copied!', 'Push token copied to clipboard');
+      Alert.alert('Push Token', pushToken);
     }
   };
 
@@ -334,7 +332,7 @@ const SettingsScreen = () => {
                   <Text style={styles.tokenText} numberOfLines={1} ellipsizeMode="middle">
                     {pushToken}
                   </Text>
-                  <Ionicons name="copy-outline" size={18} color={colors.primary} />
+                  <Ionicons name="eye-outline" size={18} color={colors.primary} />
                 </TouchableOpacity>
               ) : (
                 <Text style={styles.tokenUnavailable}>Not available</Text>
