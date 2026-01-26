@@ -95,11 +95,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
           .single();
 
         if (supabaseProfile && !error) {
+          const profilePhotos = supabaseProfile.profile_photos || [];
           const cloudUser: UserProfile = {
             name: supabaseProfile.name || '',
             email: supabaseProfile.email || '',
-            profileImage: supabaseProfile.profile_image || '',
-            profilePhotos: supabaseProfile.profile_photos || [],
+            profileImage: supabaseProfile.profile_image || profilePhotos[0] || '',
+            profilePhotos: profilePhotos,
             age: supabaseProfile.age,
             location: supabaseProfile.location || '',
             bio: supabaseProfile.bio || '',

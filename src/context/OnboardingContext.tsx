@@ -2,11 +2,10 @@ import React, { createContext, useContext, useState, useCallback, ReactNode } fr
 
 export interface OnboardingData {
   profilePhotos: string[];
+  mainPhotoIndex: number;
   name: string;
   age: number | null;
   location: string;
-  gender: 'male' | 'female' | 'non-binary' | 'prefer-not-to-say' | null;
-  seeking: ('male' | 'female' | 'non-binary')[];
   goals: ('relationship' | 'friendship' | 'practice')[];
   bio: string;
   interests: string[];
@@ -27,11 +26,10 @@ interface OnboardingContextType {
 
 const initialData: OnboardingData = {
   profilePhotos: [],
+  mainPhotoIndex: 0,
   name: '',
   age: null,
   location: '',
-  gender: null,
-  seeking: [],
   goals: [],
   bio: '',
   interests: [],
@@ -46,7 +44,7 @@ interface OnboardingProviderProps {
 export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children }) => {
   const [data, setData] = useState<OnboardingData>(initialData);
   const [currentStep, setCurrentStep] = useState(0);
-  const totalSteps = 8; // Welcome, Photo, Basics, Gender, Seeking, Goals, Interests, Complete
+  const totalSteps = 6; // Welcome, Photo, Basics, Goals, Interests, Complete
 
   const updateData = useCallback((updates: Partial<OnboardingData>) => {
     setData((prev) => ({ ...prev, ...updates }));
@@ -83,15 +81,11 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
                data.age >= 18 &&
                data.age <= 100 &&
                data.location.trim().length > 0;
-      case 3: // Gender
-        return data.gender !== null;
-      case 4: // Seeking
-        return data.seeking.length > 0;
-      case 5: // Goals
+      case 3: // Goals
         return data.goals.length > 0;
-      case 6: // Interests
+      case 4: // Interests
         return data.interests.length >= 3;
-      case 7: // Complete
+      case 5: // Complete
         return true;
       default:
         return false;

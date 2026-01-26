@@ -96,7 +96,7 @@ const OnboardingBasicsScreen: React.FC = () => {
 
   const handleContinue = () => {
     nextStep();
-    navigation.navigate('Gender');
+    navigation.navigate('Goals');
   };
 
   const handleBack = () => {

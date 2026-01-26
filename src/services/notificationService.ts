@@ -156,7 +156,14 @@ export const registerForPushNotifications = async (): Promise<string | null> => 
  */
 export const savePushToken = async (token: string): Promise<boolean> => {
   try {
-    const userId = await getCurrentUserId();
+    // Only save push token if user is authenticated with a valid UUID
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.id) {
+      console.log('No authenticated user, skipping push token save');
+      return false;
+    }
+
+    const userId = user.id;
     const deviceType = Platform.OS;
 
     // First try to save via API endpoint
@@ -212,7 +219,14 @@ export const savePushToken = async (token: string): Promise<boolean> => {
  */
 export const removePushToken = async (token?: string): Promise<boolean> => {
   try {
-    const userId = await getCurrentUserId();
+    // Only remove push token if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.id) {
+      console.log('No authenticated user, skipping push token removal');
+      return false;
+    }
+
+    const userId = user.id;
 
     // Try to remove via API first
     try {

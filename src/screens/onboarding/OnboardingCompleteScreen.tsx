@@ -38,10 +38,9 @@ const OnboardingCompleteScreen: React.FC<OnboardingCompleteScreenProps> = ({ onC
         name: data.name,
         age: data.age,
         location: data.location,
-        gender: data.gender,
-        seeking: data.seeking,
         goals: data.goals,
         profilePhotos: data.profilePhotos,
+        mainPhotoIndex: data.mainPhotoIndex,
         bio: data.bio,
         interests: data.interests,
         onboardingCompleted: true,
@@ -49,10 +48,12 @@ const OnboardingCompleteScreen: React.FC<OnboardingCompleteScreenProps> = ({ onC
 
       await saveUserProfile(profileData);
 
-      // Update local user context
+      // Update local user context - use selected main photo
+      const mainPhoto = data.profilePhotos[data.mainPhotoIndex] || data.profilePhotos[0] || '';
       updateUser({
         name: data.name,
-        profileImage: data.profilePhotos[0] || '',
+        profileImage: mainPhoto,
+        profilePhotos: data.profilePhotos,
         age: data.age || undefined,
         location: data.location,
         bio: data.bio,
@@ -134,13 +135,6 @@ const OnboardingCompleteScreen: React.FC<OnboardingCompleteScreenProps> = ({ onC
           <View style={styles.divider} />
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Looking for</Text>
-            <Text style={styles.summaryValue}>
-              {data.seeking.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(', ')}
-            </Text>
-          </View>
-
-          <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Goals</Text>
             <Text style={styles.summaryValue}>
               {data.goals.map(g => goalLabels[g] || g).join(', ')}
@@ -151,6 +145,13 @@ const OnboardingCompleteScreen: React.FC<OnboardingCompleteScreenProps> = ({ onC
             <Text style={styles.summaryLabel}>Photos</Text>
             <Text style={styles.summaryValue}>
               {data.profilePhotos.length} photo{data.profilePhotos.length !== 1 ? 's' : ''}
+            </Text>
+          </View>
+
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Interests</Text>
+            <Text style={styles.summaryValue}>
+              {data.interests.length} selected
             </Text>
           </View>
         </View>

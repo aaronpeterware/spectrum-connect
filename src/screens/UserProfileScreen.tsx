@@ -8,6 +8,8 @@ import {
   Image,
   Dimensions,
   Alert,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,6 +24,7 @@ import { supabase } from '../config/supabase';
 import { getUserId } from '../services/profileService';
 
 const { width } = Dimensions.get('window');
+const GALLERY_PHOTO_SIZE = (width - Spacing.lg * 2 - Spacing.sm * 2) / 3;
 
 type RootStackParamList = {
   UserProfile: {
@@ -51,74 +54,30 @@ type RouteParams = {
 // Storage key for followed users
 const FOLLOWED_USERS_KEY = 'followed_users';
 
-// Sample user data - in a real app this would come from an API
-const userData: Record<string, {
+interface UserData {
   name: string;
   age: number;
   location: string;
   bio: string;
   avatar: string;
+  photos: string[];
   interests: string[];
   joinedDate: string;
   postsCount: number;
   connectionsCount: number;
   isVerified: boolean;
-}> = {
-  'user1': {
-    name: 'Alex Rivera',
-    age: 28,
-    location: 'San Francisco, CA',
-    bio: "Tech enthusiast and coffee addict. I love hiking on weekends and trying new restaurants. Currently working on building meaningful connections and growing as a person. Always up for deep conversations about life, philosophy, and the future.",
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face',
-    interests: ['Hiking', 'Coffee', 'Tech', 'Philosophy', 'Travel'],
-    joinedDate: 'March 2024',
-    postsCount: 12,
-    connectionsCount: 156,
-    isVerified: true,
-  },
-  'user2': {
-    name: 'Jordan Chen',
-    age: 25,
-    location: 'New York, NY',
-    bio: "Artist and dreamer. I spend my days creating and my nights exploring the city. Looking for genuine people who appreciate art, music, and spontaneous adventures.",
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop&crop=face',
-    interests: ['Art', 'Music', 'Photography', 'City Life', 'Adventures'],
-    joinedDate: 'January 2024',
-    postsCount: 24,
-    connectionsCount: 289,
-    isVerified: true,
-  },
-  'user3': {
-    name: 'Sam Taylor',
-    age: 31,
-    location: 'Austin, TX',
-    bio: "Fitness coach by day, amateur chef by night. I believe in balance - work hard, play hard. Love meeting new people and hearing their stories.",
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop&crop=face',
-    interests: ['Fitness', 'Cooking', 'Music', 'Sports', 'Wellness'],
-    joinedDate: 'February 2024',
-    postsCount: 8,
-    connectionsCount: 94,
-    isVerified: false,
-  },
-  'user4': {
-    name: 'Casey Morgan',
-    age: 27,
-    location: 'Seattle, WA',
-    bio: "Software developer with a passion for sustainability. When I'm not coding, you'll find me volunteering or exploring the Pacific Northwest. Looking for like-minded individuals.",
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop&crop=face',
-    interests: ['Coding', 'Sustainability', 'Nature', 'Volunteering', 'Reading'],
-    joinedDate: 'April 2024',
-    postsCount: 15,
-    connectionsCount: 178,
-    isVerified: true,
-  },
-};
+  goals?: string[];
+}
 
 const UserProfileScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RouteParams, 'UserProfile'>>();
   const { userId, name, avatar } = route.params;
   const [isOwnProfile, setIsOwnProfile] = useState(false);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
+  const [isFollowing, setIsFollowing] = useState(false);
 
   // Check if user is viewing their own profile
   useEffect(() => {
@@ -127,7 +86,6 @@ const UserProfileScreen = () => {
         const currentUserId = await getUserId();
         if (currentUserId === userId) {
           setIsOwnProfile(true);
-          // Redirect to their own profile screen
           navigation.replace('Profile');
         }
       } catch (error) {
@@ -137,35 +95,79 @@ const UserProfileScreen = () => {
     checkOwnProfile();
   }, [userId, navigation]);
 
-  // Check if this is a fake profile first
-  const fakeProfile = FAKE_PROFILES.find(p => p.id === userId);
+  // Load user data
+  useEffect(() => {
+    const loadUserData = async () => {
+      setLoading(true);
+      try {
+        // Check fake profiles first
+        const fakeProfile = FAKE_PROFILES.find(p => p.id === userId);
+        if (fakeProfile) {
+          setUserData({
+            name: fakeProfile.name,
+            age: fakeProfile.age,
+            location: fakeProfile.location,
+            bio: fakeProfile.bio,
+            avatar: fakeProfile.profilePhotos[0] || avatar || '',
+            photos: fakeProfile.profilePhotos,
+            interests: fakeProfile.interests,
+            joinedDate: 'Recently',
+            postsCount: Math.floor(Math.random() * 20),
+            connectionsCount: Math.floor(Math.random() * 100) + 50,
+            isVerified: true,
+            goals: fakeProfile.goals,
+          });
+          setLoading(false);
+          return;
+        }
 
-  // Get user data - check fake profiles, then hardcoded data, then fallback
-  const user = fakeProfile ? {
-    name: fakeProfile.name,
-    age: fakeProfile.age,
-    location: fakeProfile.location,
-    bio: fakeProfile.bio,
-    avatar: fakeProfile.profilePhotos[0] || avatar || '',
-    interests: fakeProfile.interests,
-    joinedDate: 'Recently',
-    postsCount: Math.floor(Math.random() * 20),
-    connectionsCount: Math.floor(Math.random() * 100) + 50,
-    isVerified: true,
-  } : userData[userId] || {
-    name: name,
-    age: 25,
-    location: 'Unknown',
-    bio: 'This user hasn\'t added a bio yet.',
-    avatar: avatar || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop&crop=face',
-    interests: [],
-    joinedDate: 'Recently',
-    postsCount: 0,
-    connectionsCount: 0,
-    isVerified: false,
-  };
+        // Try to load from Supabase
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
 
-  const [isFollowing, setIsFollowing] = useState(false);
+        if (data && !error) {
+          setUserData({
+            name: data.name || name,
+            age: data.age || 25,
+            location: data.location || 'Unknown',
+            bio: data.bio || "This user hasn't added a bio yet.",
+            avatar: data.profile_image || data.profile_photos?.[0] || avatar || '',
+            photos: data.profile_photos || [],
+            interests: data.interests || [],
+            joinedDate: 'Recently',
+            postsCount: 0,
+            connectionsCount: 0,
+            isVerified: false,
+            goals: data.goals || [],
+          });
+        } else {
+          // Fallback
+          setUserData({
+            name: name,
+            age: 25,
+            location: 'Unknown',
+            bio: "This user hasn't added a bio yet.",
+            avatar: avatar || '',
+            photos: avatar ? [avatar] : [],
+            interests: [],
+            joinedDate: 'Recently',
+            postsCount: 0,
+            connectionsCount: 0,
+            isVerified: false,
+          });
+        }
+      } catch (error) {
+        console.log('Error loading user data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUserData();
+  }, [userId, name, avatar]);
 
   // Load follow state on mount
   useEffect(() => {
@@ -185,6 +187,7 @@ const UserProfileScreen = () => {
 
   // Handle follow/unfollow
   const handleFollowToggle = async () => {
+    if (!userData) return;
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -192,17 +195,14 @@ const UserProfileScreen = () => {
       let followedUsers: string[] = stored ? JSON.parse(stored) : [];
 
       if (isFollowing) {
-        // Unfollow
         followedUsers = followedUsers.filter(id => id !== userId);
         setIsFollowing(false);
       } else {
-        // Follow
         followedUsers.push(userId);
         setIsFollowing(true);
-        // Show confirmation
         Alert.alert(
           'Following!',
-          `You'll be notified when ${user.name} posts something new.`,
+          `You'll be notified when ${userData.name} posts something new.`,
           [{ text: 'OK' }]
         );
       }
@@ -213,15 +213,15 @@ const UserProfileScreen = () => {
     }
   };
 
-  // Handle message button - find existing conversation or create new one
+  // Handle message button
   const handleMessage = async () => {
+    if (!userData) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     try {
       const currentUserId = await getUserId();
-      const isFakeUser = !!fakeProfile;
+      const isFakeUser = !!FAKE_PROFILES.find(p => p.id === userId);
 
-      // Look for existing conversation with this user
       const { data: existingConv } = await supabase
         .from('conversations')
         .select('id')
@@ -229,17 +229,15 @@ const UserProfileScreen = () => {
         .single();
 
       if (existingConv) {
-        // Navigate to existing conversation
         navigation.navigate('Chat', {
           conversationId: existingConv.id,
-          name: user.name,
-          avatar: user.avatar,
+          name: userData.name,
+          avatar: userData.avatar,
           isOnline: true,
           recipientId: userId,
           isFakeUser,
         });
       } else {
-        // Create new conversation
         const { data: newConv } = await supabase
           .from('conversations')
           .insert({
@@ -252,8 +250,8 @@ const UserProfileScreen = () => {
         if (newConv) {
           navigation.navigate('Chat', {
             conversationId: newConv.id,
-            name: user.name,
-            avatar: user.avatar,
+            name: userData.name,
+            avatar: userData.avatar,
             isOnline: true,
             recipientId: userId,
             isFakeUser,
@@ -262,20 +260,28 @@ const UserProfileScreen = () => {
       }
     } catch (error) {
       console.log('Error finding/creating conversation:', error);
-      // Fallback - just navigate with userId as conversationId
       navigation.navigate('Chat', {
         conversationId: userId,
-        name: user.name,
-        avatar: user.avatar,
+        name: userData?.name || name,
+        avatar: userData?.avatar || avatar,
         isOnline: true,
         recipientId: userId,
-        isFakeUser: !!fakeProfile,
+        isFakeUser: !!FAKE_PROFILES.find(p => p.id === userId),
       });
     }
   };
 
+  const openPhotoViewer = (index: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedPhotoIndex(index);
+  };
+
+  const closePhotoViewer = () => {
+    setSelectedPhotoIndex(null);
+  };
+
   // Don't render if redirecting to own profile
-  if (isOwnProfile) {
+  if (isOwnProfile || !userData) {
     return null;
   }
 
@@ -300,35 +306,37 @@ const UserProfileScreen = () => {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Profile Header */}
         <View style={styles.profileHeader}>
-          <Image source={{ uri: user.avatar }} style={styles.avatar} />
+          <TouchableOpacity onPress={() => userData.photos.length > 0 && openPhotoViewer(0)}>
+            <Image source={{ uri: userData.avatar }} style={styles.avatar} />
+          </TouchableOpacity>
 
           <View style={styles.nameRow}>
-            <Text style={styles.name}>{user.name}</Text>
-            {user.isVerified && (
+            <Text style={styles.name}>{userData.name}</Text>
+            {userData.isVerified && (
               <Ionicons name="checkmark-circle" size={22} color="#4DA6FF" />
             )}
           </View>
 
           <Text style={styles.location}>
             <Ionicons name="location-outline" size={14} color={Colors.gray500} />
-            {' '}{user.location} • {user.age} years old
+            {' '}{userData.location} • {userData.age} years old
           </Text>
 
           {/* Stats */}
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{user.postsCount}</Text>
-              <Text style={styles.statLabel}>Posts</Text>
+              <Text style={styles.statNumber}>{userData.photos.length}</Text>
+              <Text style={styles.statLabel}>Photos</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{user.connectionsCount}</Text>
+              <Text style={styles.statNumber}>{userData.connectionsCount}</Text>
               <Text style={styles.statLabel}>Connections</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{user.joinedDate}</Text>
-              <Text style={styles.statLabel}>Joined</Text>
+              <Text style={styles.statNumber}>{userData.interests.length}</Text>
+              <Text style={styles.statLabel}>Interests</Text>
             </View>
           </View>
 
@@ -360,18 +368,57 @@ const UserProfileScreen = () => {
           </View>
         </View>
 
+        {/* Photo Gallery */}
+        {userData.photos.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Photos</Text>
+            <View style={styles.photoGrid}>
+              {userData.photos.map((photo, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.galleryPhotoContainer}
+                  onPress={() => openPhotoViewer(index)}
+                >
+                  <Image source={{ uri: photo }} style={styles.galleryPhoto} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* Bio Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About</Text>
-          <Text style={styles.bioText}>{user.bio}</Text>
+          <Text style={styles.bioText}>{userData.bio}</Text>
         </View>
 
+        {/* Goals Section */}
+        {userData.goals && userData.goals.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Looking for</Text>
+            <View style={styles.goalsContainer}>
+              {userData.goals.map((goal, index) => (
+                <View key={index} style={styles.goalTag}>
+                  <Ionicons
+                    name={goal === 'relationship' ? 'heart' : goal === 'friendship' ? 'people' : 'chatbubbles'}
+                    size={14}
+                    color={Colors.primary}
+                  />
+                  <Text style={styles.goalText}>
+                    {goal === 'relationship' ? 'Relationship' : goal === 'friendship' ? 'Friendship' : 'Practice'}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* Interests Section */}
-        {user.interests.length > 0 && (
+        {userData.interests.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Interests</Text>
             <View style={styles.interestsContainer}>
-              {user.interests.map((interest, index) => (
+              {userData.interests.map((interest, index) => (
                 <View key={index} style={styles.interestTag}>
                   <Text style={styles.interestText}>{interest}</Text>
                 </View>
@@ -383,6 +430,47 @@ const UserProfileScreen = () => {
         {/* Bottom Padding */}
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Photo Viewer Modal */}
+      <Modal
+        visible={selectedPhotoIndex !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={closePhotoViewer}
+      >
+        <View style={styles.modalContainer}>
+          <TouchableOpacity style={styles.closeButton} onPress={closePhotoViewer}>
+            <Ionicons name="close" size={28} color="white" />
+          </TouchableOpacity>
+
+          {selectedPhotoIndex !== null && (
+            <FlatList
+              data={userData.photos}
+              horizontal
+              pagingEnabled
+              initialScrollIndex={selectedPhotoIndex}
+              getItemLayout={(_, index) => ({
+                length: width,
+                offset: width * index,
+                index,
+              })}
+              showsHorizontalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <View style={styles.fullPhotoContainer}>
+                  <Image source={{ uri: item }} style={styles.fullPhoto} resizeMode="contain" />
+                </View>
+              )}
+              keyExtractor={(_, index) => index.toString()}
+            />
+          )}
+
+          <View style={styles.photoIndicator}>
+            <Text style={styles.photoIndicatorText}>
+              {(selectedPhotoIndex ?? 0) + 1} / {userData.photos.length}
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -525,6 +613,40 @@ const styles = StyleSheet.create({
     color: Colors.gray700,
     lineHeight: 24,
   },
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  galleryPhotoContainer: {
+    width: GALLERY_PHOTO_SIZE,
+    height: GALLERY_PHOTO_SIZE,
+    borderRadius: BorderRadius.md,
+    overflow: 'hidden',
+  },
+  galleryPhoto: {
+    width: '100%',
+    height: '100%',
+  },
+  goalsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  goalTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary + '15',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    gap: 6,
+  },
+  goalText: {
+    ...Typography.bodySmall,
+    color: Colors.primary,
+    fontWeight: '500',
+  },
   interestsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -540,6 +662,45 @@ const styles = StyleSheet.create({
     ...Typography.bodySmall,
     color: Colors.gray700,
     fontWeight: '500',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'black',
+    justifyContent: 'center',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullPhotoContainer: {
+    width: width,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullPhoto: {
+    width: width,
+    height: width,
+  },
+  photoIndicator: {
+    position: 'absolute',
+    bottom: 60,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+  },
+  photoIndicatorText: {
+    ...Typography.bodySmall,
+    color: 'white',
   },
 });
 

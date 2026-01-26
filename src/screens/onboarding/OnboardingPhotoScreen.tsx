@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
+import * as Haptics from 'expo-haptics';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { useOnboarding } from '../../context/OnboardingContext';
 
@@ -63,7 +64,7 @@ const OnboardingPhotoScreen: React.FC = () => {
 
       if (!result.canceled && result.assets[0]) {
         const newPhotos = [...data.profilePhotos, result.assets[0].uri];
-        updateData({ profilePhotos: newPhotos.slice(0, 4) }); // Max 4 photos
+        updateData({ profilePhotos: newPhotos.slice(0, 6) }); // Max 6 photos
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to pick image. Please try again.');
@@ -89,7 +90,7 @@ const OnboardingPhotoScreen: React.FC = () => {
 
       if (!result.canceled && result.assets[0]) {
         const newPhotos = [...data.profilePhotos, result.assets[0].uri];
-        updateData({ profilePhotos: newPhotos.slice(0, 4) });
+        updateData({ profilePhotos: newPhotos.slice(0, 6) });
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to take photo. Please try again.');
@@ -99,8 +100,23 @@ const OnboardingPhotoScreen: React.FC = () => {
   };
 
   const removePhoto = (index: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const newPhotos = data.profilePhotos.filter((_, i) => i !== index);
-    updateData({ profilePhotos: newPhotos });
+    // Adjust main photo index if needed
+    let newMainIndex = data.mainPhotoIndex;
+    if (index === data.mainPhotoIndex) {
+      newMainIndex = 0;
+    } else if (index < data.mainPhotoIndex) {
+      newMainIndex = data.mainPhotoIndex - 1;
+    }
+    updateData({ profilePhotos: newPhotos, mainPhotoIndex: Math.min(newMainIndex, newPhotos.length - 1) });
+  };
+
+  const setMainPhoto = (index: number) => {
+    if (data.profilePhotos[index]) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      updateData({ mainPhotoIndex: index });
+    }
   };
 
   const showPhotoOptions = () => {
@@ -117,45 +133,69 @@ const OnboardingPhotoScreen: React.FC = () => {
 
   const renderPhotoSlot = (index: number) => {
     const photo = data.profilePhotos[index];
+    const isMain = index === data.mainPhotoIndex;
 
     if (photo) {
       return (
-        <View key={index} style={styles.photoSlot}>
+        <TouchableOpacity
+          key={index}
+          style={[styles.photoSlot, isMain && styles.mainPhotoSlot]}
+          onPress={() => setMainPhoto(index)}
+          onLongPress={() => {
+            Alert.alert(
+              'Remove Photo',
+              'Are you sure you want to remove this photo?',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Remove', style: 'destructive', onPress: () => removePhoto(index) },
+              ]
+            );
+          }}
+          activeOpacity={0.9}
+        >
           <Image source={{ uri: photo }} style={styles.photo} />
           <TouchableOpacity
             style={styles.removeButton}
             onPress={() => removePhoto(index)}
           >
-            <Ionicons name="close-circle" size={28} color={Colors.error} />
+            <Ionicons name="close-circle" size={26} color={Colors.error} />
           </TouchableOpacity>
-          {index === 0 && (
+          {isMain && (
             <View style={styles.mainBadge}>
-              <Text style={styles.mainBadgeText}>Main</Text>
+              <Ionicons name="star" size={12} color={Colors.surface} />
+              <Text style={styles.mainBadgeText}>Profile</Text>
             </View>
           )}
-        </View>
+          {!isMain && (
+            <TouchableOpacity
+              style={styles.setMainButton}
+              onPress={() => setMainPhoto(index)}
+            >
+              <Ionicons name="star-outline" size={16} color={Colors.surface} />
+            </TouchableOpacity>
+          )}
+        </TouchableOpacity>
       );
     }
+
+    const canAdd = index === 0 || data.profilePhotos.length >= index;
 
     return (
       <TouchableOpacity
         key={index}
-        style={[styles.photoSlot, styles.emptySlot]}
-        onPress={showPhotoOptions}
-        disabled={loading || (index > 0 && !data.profilePhotos[index - 1])}
+        style={[styles.photoSlot, styles.emptySlot, !canAdd && styles.disabledSlot]}
+        onPress={canAdd ? showPhotoOptions : undefined}
+        disabled={loading || !canAdd}
       >
-        <View style={styles.addIcon}>
+        <View style={[styles.addIcon, !canAdd && styles.addIconDisabled]}>
           <Ionicons
             name="add"
-            size={32}
-            color={index === 0 || data.profilePhotos[index - 1] ? Colors.primary : Colors.gray300}
+            size={28}
+            color={canAdd ? Colors.primary : Colors.gray300}
           />
         </View>
-        <Text style={[
-          styles.addText,
-          { color: index === 0 || data.profilePhotos[index - 1] ? Colors.gray600 : Colors.gray300 }
-        ]}>
-          {index === 0 ? 'Add main photo' : 'Add photo'}
+        <Text style={[styles.addText, !canAdd && styles.addTextDisabled]}>
+          {index === 0 ? 'Add photo' : `Photo ${index + 1}`}
         </Text>
       </TouchableOpacity>
     );
@@ -176,18 +216,22 @@ const OnboardingPhotoScreen: React.FC = () => {
       <View style={styles.content}>
         <Text style={styles.title}>Add your photos</Text>
         <Text style={styles.subtitle}>
-          Add at least one photo to help others recognize you. Your main photo will be the first one shown.
+          Add up to 6 photos. Tap a photo to set it as your main profile picture.
         </Text>
 
         <View style={styles.photoGrid}>
-          {[0, 1, 2, 3].map(renderPhotoSlot)}
+          {[0, 1, 2, 3, 4, 5].map(renderPhotoSlot)}
         </View>
 
         <View style={styles.tips}>
-          <Text style={styles.tipsTitle}>Photo Tips:</Text>
-          <Text style={styles.tipText}>• Choose a clear photo of your face</Text>
-          <Text style={styles.tipText}>• Good lighting makes a difference</Text>
-          <Text style={styles.tipText}>• Show your authentic self</Text>
+          <View style={styles.tipRow}>
+            <Ionicons name="star" size={16} color={Colors.primary} />
+            <Text style={styles.tipText}>Tap any photo to make it your profile picture</Text>
+          </View>
+          <View style={styles.tipRow}>
+            <Ionicons name="close-circle" size={16} color={Colors.gray400} />
+            <Text style={styles.tipText}>Tap × or long press to remove a photo</Text>
+          </View>
         </View>
       </View>
 
@@ -241,7 +285,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.lg,
+    paddingTop: Spacing.md,
   },
   title: {
     ...Typography.h1,
@@ -251,20 +295,24 @@ const styles = StyleSheet.create({
   subtitle: {
     ...Typography.body,
     color: Colors.gray600,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
   },
   photoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.lg,
-    justifyContent: 'center',
-    marginBottom: Spacing.xl,
+    gap: Spacing.md,
+    justifyContent: 'space-between',
+    marginBottom: Spacing.lg,
   },
   photoSlot: {
     width: PHOTO_SIZE,
     height: PHOTO_SIZE,
     borderRadius: BorderRadius.lg,
     overflow: 'hidden',
+  },
+  mainPhotoSlot: {
+    borderWidth: 3,
+    borderColor: Colors.primary,
   },
   emptySlot: {
     backgroundColor: Colors.gray100,
@@ -274,6 +322,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  disabledSlot: {
+    opacity: 0.5,
+  },
   photo: {
     width: '100%',
     height: '100%',
@@ -281,10 +332,10 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 6,
+    right: 6,
     backgroundColor: Colors.surface,
-    borderRadius: 14,
+    borderRadius: 13,
   },
   mainBadge: {
     position: 'absolute',
@@ -294,44 +345,64 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     borderRadius: BorderRadius.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   mainBadgeText: {
     ...Typography.caption,
     color: Colors.surface,
     fontWeight: '600',
   },
+  setMainButton: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 6,
+    borderRadius: BorderRadius.sm,
+  },
   addIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: Colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
+  addIconDisabled: {
+    backgroundColor: Colors.gray200,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   addText: {
     ...Typography.caption,
+    color: Colors.gray600,
+  },
+  addTextDisabled: {
+    color: Colors.gray300,
   },
   tips: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
+    padding: Spacing.md,
+    gap: Spacing.sm,
   },
-  tipsTitle: {
-    ...Typography.bodySmall,
-    fontWeight: '600',
-    color: Colors.gray800,
-    marginBottom: Spacing.sm,
+  tipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
   tipText: {
     ...Typography.bodySmall,
     color: Colors.gray600,
-    marginBottom: 4,
+    flex: 1,
   },
   footer: {
     paddingHorizontal: Spacing.xl,

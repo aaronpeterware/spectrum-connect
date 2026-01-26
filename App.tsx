@@ -50,9 +50,7 @@ import {
   OnboardingWelcomeScreen,
   OnboardingPhotoScreen,
   OnboardingBasicsScreen,
-  OnboardingGenderScreen,
-  OnboardingSeekingScreen,
-  OnboardingGoalsScreen,
+    OnboardingGoalsScreen,
   OnboardingInterestsScreen,
   OnboardingCompleteScreen,
 } from './src/screens/onboarding';
@@ -106,8 +104,6 @@ export type OnboardingStackParamList = {
   Welcome: undefined;
   Photo: undefined;
   Basics: undefined;
-  Gender: undefined;
-  Seeking: undefined;
   Goals: undefined;
   Interests: undefined;
   Complete: undefined;
@@ -135,11 +131,9 @@ const OnboardingNavigator: React.FC<{ onComplete: () => void }> = ({ onComplete 
       case 0: return 'Welcome';
       case 1: return 'Photo';
       case 2: return 'Basics';
-      case 3: return 'Gender';
-      case 4: return 'Seeking';
-      case 5: return 'Goals';
-      case 6: return 'Interests';
-      case 7: return 'Complete';
+      case 3: return 'Goals';
+      case 4: return 'Interests';
+      case 5: return 'Complete';
       default: return 'Welcome';
     }
   };
@@ -152,8 +146,6 @@ const OnboardingNavigator: React.FC<{ onComplete: () => void }> = ({ onComplete 
       <OnboardingStack.Screen name="Welcome" component={OnboardingWelcomeScreen} />
       <OnboardingStack.Screen name="Photo" component={OnboardingPhotoScreen} />
       <OnboardingStack.Screen name="Basics" component={OnboardingBasicsScreen} />
-      <OnboardingStack.Screen name="Gender" component={OnboardingGenderScreen} />
-      <OnboardingStack.Screen name="Seeking" component={OnboardingSeekingScreen} />
       <OnboardingStack.Screen name="Goals" component={OnboardingGoalsScreen} />
       <OnboardingStack.Screen name="Interests" component={OnboardingInterestsScreen} />
       <OnboardingStack.Screen name="Complete">

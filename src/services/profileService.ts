@@ -9,10 +9,11 @@ export interface UserProfileData {
   name: string;
   age: number | null;
   location: string;
-  gender: 'male' | 'female' | 'non-binary' | 'prefer-not-to-say' | null;
-  seeking: string[];
+  gender?: 'male' | 'female' | 'non-binary' | 'prefer-not-to-say' | null;
+  seeking?: string[];
   goals: string[];
   profilePhotos: string[];
+  mainPhotoIndex?: number;
   bio?: string;
   interests?: string[];
   communicationStyle?: string;
@@ -41,15 +42,19 @@ export const saveUserProfile = async (profileData: UserProfileData): Promise<voi
   try {
     const userId = await getUserId();
 
+    const mainPhotoIndex = profileData.mainPhotoIndex ?? 0;
+    const mainPhoto = profileData.profilePhotos[mainPhotoIndex] || profileData.profilePhotos[0] || '';
+
     const supabaseProfile = {
       id: userId,
       name: profileData.name,
       age: profileData.age,
       location: profileData.location,
-      gender: profileData.gender,
-      seeking: profileData.seeking,
+      gender: profileData.gender || null,
+      seeking: profileData.seeking || [],
       goals: profileData.goals,
       profile_photos: profileData.profilePhotos,
+      profile_image: mainPhoto,
       bio: profileData.bio || '',
       interests: profileData.interests || [],
       communication_style: profileData.communicationStyle || '',
@@ -206,7 +211,7 @@ export const getProfileById = async (profileId: string): Promise<UserProfileData
   }
 };
 
-// Auto-match new user with fake profiles and real users
+// Auto-match new user with fake profiles and real users based on shared interests
 export const autoMatchNewUser = async (): Promise<void> => {
   try {
     const userId = await getUserId();
@@ -217,32 +222,34 @@ export const autoMatchNewUser = async (): Promise<void> => {
       return;
     }
 
-    // Get all fake profiles that match user's seeking preferences
-    const matchingFakeProfiles = FAKE_PROFILES.filter(
-      profile => userProfile.seeking.includes(profile.gender)
-    );
+    const userInterests = userProfile.interests || [];
 
-    console.log(`Auto-matching with ${matchingFakeProfiles.length} fake profiles`);
+    // Match with all fake profiles (they're designed to be compatible)
+    console.log(`Auto-matching with ${FAKE_PROFILES.length} fake profiles`);
 
-    // Create matches with fake profiles
-    for (const fakeProfile of matchingFakeProfiles) {
+    for (const fakeProfile of FAKE_PROFILES) {
       await createMutualMatch(userId, fakeProfile.id);
     }
 
-    // Also match with other real users
+    // Also match with other real users who share interests
     const { data: realUsers, error } = await supabase
       .from('user_profiles')
-      .select('id, gender')
+      .select('id, interests')
       .eq('onboarding_completed', true)
       .eq('is_fake', false)
       .neq('id', userId);
 
     if (realUsers && !error) {
-      const matchingRealUsers = realUsers.filter(
-        user => userProfile.seeking.includes(user.gender)
-      );
+      // Match with users who share at least 2 interests
+      const matchingRealUsers = realUsers.filter(user => {
+        const theirInterests = user.interests || [];
+        const sharedInterests = userInterests.filter(interest =>
+          theirInterests.includes(interest)
+        );
+        return sharedInterests.length >= 2;
+      });
 
-      console.log(`Auto-matching with ${matchingRealUsers.length} real users`);
+      console.log(`Auto-matching with ${matchingRealUsers.length} real users based on shared interests`);
 
       for (const realUser of matchingRealUsers) {
         await createMutualMatch(userId, realUser.id);
