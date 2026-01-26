@@ -14,6 +14,11 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { useOnboarding } from '../../context/OnboardingContext';
+import {
+  trackOnboardingStarted,
+  trackTermsAccepted,
+  trackScreen,
+} from '../../services/analyticsService';
 
 type OnboardingStackParamList = {
   Welcome: undefined;
@@ -33,8 +38,15 @@ const OnboardingWelcomeScreen: React.FC = () => {
   const { nextStep } = useOnboarding();
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
+  // Track screen view and onboarding started on mount
+  React.useEffect(() => {
+    trackScreen('OnboardingWelcome');
+    trackOnboardingStarted();
+  }, []);
+
   const handleGetStarted = () => {
     if (!acceptedTerms) return;
+    trackTermsAccepted();
     nextStep();
     navigation.navigate('Photo');
   };

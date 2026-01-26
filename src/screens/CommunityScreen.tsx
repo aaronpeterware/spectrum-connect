@@ -24,6 +24,10 @@ import { useUser } from '../context/UserContext';
 import { useSettings } from '../context/SettingsContext';
 import { useTheme } from '../hooks/useTheme';
 import MenuModal from '../components/MenuModal';
+import {
+  trackPostLiked,
+  trackScreen,
+} from '../services/analyticsService';
 
 type RootStackParamList = {
   CreatePost: undefined;
@@ -256,6 +260,7 @@ const CommunityScreen = () => {
   // Wrapper for toggleLike with haptic feedback
   const handleLikeWithHaptic = (postId: string) => {
     triggerHaptic('light');
+    trackPostLiked(postId);
     toggleLike(postId);
   };
 

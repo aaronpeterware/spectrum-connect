@@ -14,6 +14,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { usePurchases } from '../context/PurchaseContext';
 import { useTheme } from '../hooks/useTheme';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
+import {
+  trackPaywallViewed,
+  trackPlanSelected,
+  trackPurchaseInitiated,
+  trackPurchaseCompleted,
+  trackPurchaseFailed,
+  trackPurchaseCancelled,
+  trackPurchaseRestored,
+  trackPaywallDismissed,
+} from '../services/analyticsService';
 
 interface PaywallProps {
   onClose?: () => void;
@@ -34,10 +44,18 @@ const Paywall: React.FC<PaywallProps> = ({ onClose, onPurchaseComplete }) => {
   const [selectedPackage, setSelectedPackage] = useState<any | null>(null);
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [paywallSource] = useState<'onboarding' | 'store' | 'feature_gate'>('onboarding');
 
   useEffect(() => {
     refreshOfferings();
   }, []);
+
+  // Track paywall view when offerings load
+  useEffect(() => {
+    if (offerings?.current?.availablePackages) {
+      trackPaywallViewed(paywallSource, offerings.current.availablePackages.length);
+    }
+  }, [offerings]);
 
   // Select the default package (usually annual for best value)
   useEffect(() => {
@@ -55,20 +73,32 @@ const Paywall: React.FC<PaywallProps> = ({ onClose, onPurchaseComplete }) => {
   const handlePurchase = async () => {
     if (!selectedPackage) return;
 
+    const planType = selectedPackage.identifier || 'unknown';
+    const price = selectedPackage.product?.priceString || 'unknown';
+
+    trackPurchaseInitiated(planType, price);
     setIsPurchasing(true);
+
     try {
       const result = await purchaseProduct(selectedPackage);
 
       if (result.success) {
+        trackPurchaseCompleted(planType, price);
         Alert.alert(
           'Welcome to Haven Pro!',
           'You now have unlimited access to all Haven features.',
           [{ text: 'Continue', onPress: onPurchaseComplete }]
         );
-      } else if (result.error && result.error !== 'Purchase cancelled') {
-        Alert.alert('Purchase Failed', result.error);
+      } else if (result.error) {
+        if (result.error === 'Purchase cancelled') {
+          trackPurchaseCancelled(planType);
+        } else {
+          trackPurchaseFailed(planType, 'purchase_error', result.error);
+          Alert.alert('Purchase Failed', result.error);
+        }
       }
     } catch (error: any) {
+      trackPurchaseFailed(planType, 'exception', error.message || 'Something went wrong');
       Alert.alert('Error', error.message || 'Something went wrong');
     } finally {
       setIsPurchasing(false);
@@ -81,6 +111,7 @@ const Paywall: React.FC<PaywallProps> = ({ onClose, onPurchaseComplete }) => {
       const result = await restorePurchases();
 
       if (result.hasProAccess) {
+        trackPurchaseRestored('restored');
         Alert.alert(
           'Purchases Restored',
           'Your Haven Pro subscription has been restored.',
@@ -97,6 +128,20 @@ const Paywall: React.FC<PaywallProps> = ({ onClose, onPurchaseComplete }) => {
     } finally {
       setIsRestoring(false);
     }
+  };
+
+  const handleClose = () => {
+    trackPaywallDismissed(paywallSource);
+    if (onClose) {
+      onClose();
+    }
+  };
+
+  const handleSelectPackage = (pkg: any) => {
+    setSelectedPackage(pkg);
+    const planType = pkg.identifier || 'unknown';
+    const price = pkg.product?.priceString || 'unknown';
+    trackPlanSelected(planType, price);
   };
 
   const formatPrice = (pkg: PurchasesPackage): string => {
@@ -146,7 +191,7 @@ const Paywall: React.FC<PaywallProps> = ({ onClose, onPurchaseComplete }) => {
             Enjoy unlimited access to all features.
           </Text>
           {onClose && (
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
               <Text style={styles.closeButtonText}>Close</Text>
             </TouchableOpacity>
           )}
@@ -165,7 +210,7 @@ const Paywall: React.FC<PaywallProps> = ({ onClose, onPurchaseComplete }) => {
       {/* Header */}
       <View style={styles.header}>
         {onClose && (
-          <TouchableOpacity style={styles.closeIcon} onPress={onClose}>
+          <TouchableOpacity style={styles.closeIcon} onPress={handleClose}>
             <Ionicons name="close" size={28} color={colors.text} />
           </TouchableOpacity>
         )}
@@ -221,7 +266,7 @@ const Paywall: React.FC<PaywallProps> = ({ onClose, onPurchaseComplete }) => {
               { backgroundColor: colors.cardBackground },
               selectedPackage?.identifier === pkg.identifier && styles.packageCardSelected,
             ]}
-            onPress={() => setSelectedPackage(pkg)}
+            onPress={() => handleSelectPackage(pkg)}
           >
             {getSavingsText(pkg) && (
               <View style={styles.savingsBadge}>

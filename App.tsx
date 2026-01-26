@@ -20,6 +20,15 @@ import {
   handleNotificationResponse,
 } from './src/services/notificationService';
 
+// Analytics Service
+import {
+  initAnalytics,
+  trackAppOpened,
+  setupAppStateTracking,
+  identify,
+  setUserProperties,
+} from './src/services/analyticsService';
+
 // Screens
 import HomeScreen from './src/screens/HomeScreen';
 import CompanionScreen from './src/screens/CompanionScreen';
@@ -246,9 +255,47 @@ const MainTabs = () => {
 
 // Main app navigation with conditional onboarding
 const AppNavigator = () => {
-  const { isLoaded, onboardingCompleted, setOnboardingCompleted } = useUser();
+  const { isLoaded, onboardingCompleted, setOnboardingCompleted, user } = useUser();
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
   const notificationListenerCleanup = useRef<(() => void) | null>(null);
+  const appStateCleanup = useRef<(() => void) | null>(null);
+
+  // Initialize analytics
+  useEffect(() => {
+    const initializeAnalytics = async () => {
+      await initAnalytics();
+      trackAppOpened();
+
+      // Setup app state tracking for background/foreground events
+      appStateCleanup.current = setupAppStateTracking();
+    };
+
+    initializeAnalytics();
+
+    return () => {
+      if (appStateCleanup.current) {
+        appStateCleanup.current();
+      }
+    };
+  }, []);
+
+  // Identify user when loaded
+  useEffect(() => {
+    if (isLoaded && user?.email) {
+      identify(user.email, {
+        name: user.name,
+        email: user.email,
+        onboarding_completed: onboardingCompleted,
+      });
+      setUserProperties({
+        name: user.name,
+        age: user.age,
+        location: user.location,
+        interests: user.interests,
+        goals: user.goals,
+      });
+    }
+  }, [isLoaded, user]);
 
   // Initialize notifications when app loads
   useEffect(() => {

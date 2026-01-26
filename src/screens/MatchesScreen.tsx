@@ -24,6 +24,11 @@ import {
   sendIntroMessage,
   getSharedTraits,
 } from '../services/matchingService';
+import {
+  trackMatchViewed,
+  trackMatchMessaged,
+  trackScreen,
+} from '../services/analyticsService';
 
 type LocationFilter = 'US' | 'AUS';
 type AgeRangeFilter = '18-25' | '26-30' | '31-40' | '40+';
@@ -179,6 +184,7 @@ const MatchesScreen = () => {
 
   const handleSendIntro = async (profile: SafeMatchProfile) => {
     setSendingIntro(profile.id);
+    trackMatchMessaged(profile.id);
     try {
       const result = await sendIntroMessage(profile.id);
       if (result.success && result.conversationId) {
@@ -199,6 +205,9 @@ const MatchesScreen = () => {
   };
 
   const handleViewProfile = (profile: SafeMatchProfile) => {
+    // Track profile view
+    trackMatchViewed(profile.id);
+
     // Don't allow viewing own profile from matches (shouldn't happen, but safety check)
     if (profile.id === currentUserId) {
       navigation.navigate('Profile' as never);

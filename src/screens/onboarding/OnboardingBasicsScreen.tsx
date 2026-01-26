@@ -15,6 +15,11 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { useOnboarding } from '../../context/OnboardingContext';
+import {
+  trackBasicsCompleted,
+  trackOnboardingStepBack,
+  trackScreen,
+} from '../../services/analyticsService';
 
 type OnboardingStackParamList = {
   Welcome: undefined;
@@ -94,12 +99,19 @@ const OnboardingBasicsScreen: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [ageError, setAgeError] = useState('');
 
+  // Track screen view on mount
+  React.useEffect(() => {
+    trackScreen('OnboardingBasics');
+  }, []);
+
   const handleContinue = () => {
+    trackBasicsCompleted(data.name, data.age, data.location);
     nextStep();
     navigation.navigate('Goals');
   };
 
   const handleBack = () => {
+    trackOnboardingStepBack(2, 1);
     prevStep();
     navigation.goBack();
   };

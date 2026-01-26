@@ -12,6 +12,11 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { useOnboarding } from '../../context/OnboardingContext';
+import {
+  trackInterestsSelected,
+  trackOnboardingStepBack,
+  trackScreen,
+} from '../../services/analyticsService';
 
 type OnboardingStackParamList = {
   Welcome: undefined;
@@ -87,12 +92,30 @@ const OnboardingInterestsScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<OnboardingStackParamList>>();
   const { data, updateData, nextStep, prevStep } = useOnboarding();
 
+  // Track screen view on mount
+  React.useEffect(() => {
+    trackScreen('OnboardingInterests');
+  }, []);
+
+  // Get unique categories for selected interests
+  const getSelectedCategories = (): string[] => {
+    const categories: string[] = [];
+    INTEREST_CATEGORIES.forEach(category => {
+      if (category.interests.some(interest => data.interests?.includes(interest))) {
+        categories.push(category.title);
+      }
+    });
+    return categories;
+  };
+
   const handleContinue = () => {
+    trackInterestsSelected(data.interests || [], getSelectedCategories());
     nextStep();
     navigation.navigate('Complete');
   };
 
   const handleBack = () => {
+    trackOnboardingStepBack(4, 3);
     prevStep();
     navigation.goBack();
   };

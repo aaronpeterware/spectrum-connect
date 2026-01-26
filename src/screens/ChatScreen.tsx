@@ -32,6 +32,11 @@ import { getUserId } from '../services/profileService';
 import { simulateFakeUserResponse } from '../services/matchingService';
 import { useTheme } from '../hooks/useTheme';
 import { sendMessageNotification } from '../services/notificationService';
+import {
+  trackMessageSent,
+  trackCompanionChatStarted,
+  trackScreen,
+} from '../services/analyticsService';
 
 // Opening messages for companions - natural, warm, showing they're also on the spectrum
 const COMPANION_OPENERS: Record<string, string[]> = {
@@ -534,6 +539,9 @@ const ChatScreen = () => {
         sender: replyingTo.sender,
       } : undefined,
     };
+
+    // Track message sent
+    trackMessageSent(conversationId, userText.length);
 
     // Update state and save immediately
     const updatedMessages = [...messagesRef.current, newMessage];

@@ -11,6 +11,11 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { useOnboarding } from '../../context/OnboardingContext';
+import {
+  trackGoalsSelected,
+  trackOnboardingStepBack,
+  trackScreen,
+} from '../../services/analyticsService';
 
 type OnboardingStackParamList = {
   Welcome: undefined;
@@ -61,12 +66,19 @@ const OnboardingGoalsScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<OnboardingStackParamList>>();
   const { data, updateData, nextStep, prevStep, canProceed } = useOnboarding();
 
+  // Track screen view on mount
+  React.useEffect(() => {
+    trackScreen('OnboardingGoals');
+  }, []);
+
   const handleContinue = () => {
+    trackGoalsSelected(data.goals);
     nextStep();
     navigation.navigate('Interests');
   };
 
   const handleBack = () => {
+    trackOnboardingStepBack(3, 2);
     prevStep();
     navigation.goBack();
   };

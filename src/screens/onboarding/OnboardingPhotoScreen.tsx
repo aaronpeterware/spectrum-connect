@@ -16,6 +16,15 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { useOnboarding } from '../../context/OnboardingContext';
+import {
+  trackPhotoAdded,
+  trackPhotoRemoved,
+  trackMainPhotoSet,
+  trackPhotoCompleted,
+  trackOnboardingStepBack,
+  trackPermissionDenied,
+  trackScreen,
+} from '../../services/analyticsService';
 
 type OnboardingStackParamList = {
   Welcome: undefined;
@@ -36,12 +45,19 @@ const OnboardingPhotoScreen: React.FC = () => {
   const { data, updateData, nextStep, prevStep, canProceed } = useOnboarding();
   const [loading, setLoading] = useState(false);
 
+  // Track screen view on mount
+  React.useEffect(() => {
+    trackScreen('OnboardingPhoto');
+  }, []);
+
   const handleContinue = () => {
+    trackPhotoCompleted(data.profilePhotos.length);
     nextStep();
     navigation.navigate('Basics');
   };
 
   const handleBack = () => {
+    trackOnboardingStepBack(1, 0);
     prevStep();
     navigation.goBack();
   };
@@ -50,6 +66,7 @@ const OnboardingPhotoScreen: React.FC = () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
+        trackPermissionDenied('photo_library');
         Alert.alert('Permission Required', 'Please allow access to your photo library to add photos.');
         return;
       }
@@ -65,6 +82,7 @@ const OnboardingPhotoScreen: React.FC = () => {
       if (!result.canceled && result.assets[0]) {
         const newPhotos = [...data.profilePhotos, result.assets[0].uri];
         updateData({ profilePhotos: newPhotos.slice(0, 6) }); // Max 6 photos
+        trackPhotoAdded(newPhotos.length, 'library');
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to pick image. Please try again.');
@@ -77,6 +95,7 @@ const OnboardingPhotoScreen: React.FC = () => {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
+        trackPermissionDenied('camera');
         Alert.alert('Permission Required', 'Please allow access to your camera to take photos.');
         return;
       }
@@ -91,6 +110,7 @@ const OnboardingPhotoScreen: React.FC = () => {
       if (!result.canceled && result.assets[0]) {
         const newPhotos = [...data.profilePhotos, result.assets[0].uri];
         updateData({ profilePhotos: newPhotos.slice(0, 6) });
+        trackPhotoAdded(newPhotos.length, 'camera');
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to take photo. Please try again.');
@@ -110,12 +130,14 @@ const OnboardingPhotoScreen: React.FC = () => {
       newMainIndex = data.mainPhotoIndex - 1;
     }
     updateData({ profilePhotos: newPhotos, mainPhotoIndex: Math.min(newMainIndex, newPhotos.length - 1) });
+    trackPhotoRemoved(newPhotos.length);
   };
 
   const setMainPhoto = (index: number) => {
     if (data.profilePhotos[index]) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       updateData({ mainPhotoIndex: index });
+      trackMainPhotoSet(index);
     }
   };
 

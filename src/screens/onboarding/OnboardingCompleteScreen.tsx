@@ -16,6 +16,11 @@ import { useOnboarding } from '../../context/OnboardingContext';
 import { useUser } from '../../context/UserContext';
 import { saveUserProfile, autoMatchNewUser } from '../../services/profileService';
 import Paywall from '../../components/Paywall';
+import {
+  trackOnboardingCompleted,
+  trackOnboardingError,
+  trackScreen,
+} from '../../services/analyticsService';
 
 interface OnboardingCompleteScreenProps {
   onComplete: () => void;
@@ -27,6 +32,11 @@ const OnboardingCompleteScreen: React.FC<OnboardingCompleteScreenProps> = ({ onC
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
+
+  // Track screen view on mount
+  React.useEffect(() => {
+    trackScreen('OnboardingComplete');
+  }, []);
 
   const handleComplete = async () => {
     setLoading(true);
@@ -64,11 +74,15 @@ const OnboardingCompleteScreen: React.FC<OnboardingCompleteScreenProps> = ({ onC
       // Auto-match with fake profiles and other real users
       await autoMatchNewUser();
 
+      // Track onboarding completed
+      trackOnboardingCompleted();
+
       // Show paywall before navigating to main app
       setShowPaywall(true);
     } catch (err) {
       console.error('Error completing onboarding:', err);
       setError('Something went wrong. Please try again.');
+      trackOnboardingError(5, 'save_profile_error', err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
