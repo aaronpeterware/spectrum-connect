@@ -25,6 +25,7 @@ import { useTheme } from '../hooks/useTheme';
 import * as ImagePicker from 'expo-image-picker';
 import MenuModal from '../components/MenuModal';
 import { getPushToken, sendTestNotification } from '../services/notificationService';
+import { supabase } from '../config/supabase';
 
 type RootStackParamList = {
   PrivacySecurity: undefined;
@@ -55,6 +56,13 @@ const SettingsScreen = () => {
   const [menuVisible, setMenuVisible] = useState(false);
   const [pushToken, setPushToken] = useState<string | null>(null);
   const [sendingTest, setSendingTest] = useState(false);
+
+  // Feedback state
+  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
+  const [feedbackCategory, setFeedbackCategory] = useState<'bug' | 'feature' | 'general' | 'complaint' | 'praise'>('general');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [feedbackRating, setFeedbackRating] = useState<number>(0);
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
   // Load push token on mount
   useEffect(() => {
@@ -89,6 +97,48 @@ const SettingsScreen = () => {
       Alert.alert('Sent!', 'Test notification sent. Background the app to see it.');
     } else {
       Alert.alert('Error', 'Failed to send test notification.');
+    }
+  };
+
+  const handleOpenFeedback = () => {
+    triggerHaptic('light');
+    setFeedbackCategory('general');
+    setFeedbackMessage('');
+    setFeedbackRating(0);
+    setFeedbackModalVisible(true);
+  };
+
+  const handleSubmitFeedback = async () => {
+    if (!feedbackMessage.trim()) {
+      Alert.alert('Required', 'Please enter your feedback message.');
+      return;
+    }
+
+    setSubmittingFeedback(true);
+    triggerHaptic('light');
+
+    try {
+      const { error } = await supabase.from('feedback').insert({
+        user_email: user.email,
+        user_name: user.name,
+        category: feedbackCategory,
+        message: feedbackMessage.trim(),
+        rating: feedbackRating > 0 ? feedbackRating : null,
+        app_version: '1.0.0',
+        device_info: Platform.OS,
+        is_read: false,
+      });
+
+      if (error) throw error;
+
+      triggerHaptic('success');
+      Alert.alert('Thank You!', 'Your feedback has been submitted. We appreciate you taking the time to help us improve Haven.');
+      setFeedbackModalVisible(false);
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      Alert.alert('Error', 'Failed to submit feedback. Please try again.');
+    } finally {
+      setSubmittingFeedback(false);
     }
   };
 
@@ -417,6 +467,15 @@ const SettingsScreen = () => {
               <Text style={styles.menuTitle}>Help & Support</Text>
               <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
             </TouchableOpacity>
+            <View style={styles.divider} />
+            <TouchableOpacity
+              style={styles.menuRow}
+              onPress={handleOpenFeedback}
+            >
+              <Text style={styles.menuIcon}>💬</Text>
+              <Text style={styles.menuTitle}>Send Feedback</Text>
+              <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -519,6 +578,116 @@ const SettingsScreen = () => {
                   numberOfLines={4}
                   textAlignVertical="top"
                 />
+              </View>
+
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Feedback Modal */}
+      <Modal
+        visible={feedbackModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setFeedbackModalVisible(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+          >
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setFeedbackModalVisible(false)}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Send Feedback</Text>
+              <TouchableOpacity onPress={handleSubmitFeedback} disabled={submittingFeedback}>
+                <Text style={[styles.saveText, submittingFeedback && { opacity: 0.5 }]}>
+                  {submittingFeedback ? 'Sending...' : 'Send'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+              {/* Category Selector */}
+              <View style={styles.formSection}>
+                <Text style={styles.inputLabel}>Category</Text>
+                <View style={styles.feedbackCategoryContainer}>
+                  {[
+                    { key: 'general', label: '💭 General', color: colors.primary },
+                    { key: 'feature', label: '✨ Feature Request', color: colors.success },
+                    { key: 'bug', label: '🐛 Bug Report', color: colors.error },
+                    { key: 'praise', label: '❤️ Praise', color: '#EC4899' },
+                    { key: 'complaint', label: '😔 Complaint', color: colors.warning },
+                  ].map((cat) => (
+                    <TouchableOpacity
+                      key={cat.key}
+                      style={[
+                        styles.feedbackCategoryOption,
+                        feedbackCategory === cat.key && {
+                          backgroundColor: `${cat.color}15`,
+                          borderColor: cat.color,
+                        },
+                      ]}
+                      onPress={() => {
+                        triggerHaptic('light');
+                        setFeedbackCategory(cat.key as typeof feedbackCategory);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.feedbackCategoryText,
+                          feedbackCategory === cat.key && { color: cat.color },
+                        ]}
+                      >
+                        {cat.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Rating */}
+              <View style={styles.formSection}>
+                <Text style={styles.inputLabel}>How would you rate your experience? (Optional)</Text>
+                <View style={styles.ratingContainer}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => {
+                        triggerHaptic('light');
+                        setFeedbackRating(star === feedbackRating ? 0 : star);
+                      }}
+                    >
+                      <Text style={styles.ratingStar}>
+                        {star <= feedbackRating ? '⭐' : '☆'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Message */}
+              <View style={styles.formSection}>
+                <Text style={styles.inputLabel}>Your Feedback</Text>
+                <TextInput
+                  style={[styles.input, styles.feedbackInput]}
+                  value={feedbackMessage}
+                  onChangeText={setFeedbackMessage}
+                  placeholder="Tell us what's on your mind..."
+                  placeholderTextColor={colors.inputPlaceholder}
+                  multiline
+                  numberOfLines={6}
+                  textAlignVertical="top"
+                />
+              </View>
+
+              <View style={styles.feedbackNote}>
+                <Text style={styles.feedbackNoteText}>
+                  💜 Your feedback helps us make Haven better for everyone. Thank you for taking the time to share your thoughts!
+                </Text>
               </View>
 
               <View style={{ height: 40 }} />
@@ -913,6 +1082,49 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   },
   testNotificationTextDisabled: {
     color: colors.textTertiary,
+  },
+  // Feedback styles
+  feedbackCategoryContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  feedbackCategoryOption: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  feedbackCategoryText: {
+    ...Typography.bodySmall,
+    fontWeight: '500',
+    color: colors.textSecondary,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    justifyContent: 'center',
+    paddingVertical: Spacing.md,
+  },
+  ratingStar: {
+    fontSize: 32,
+  },
+  feedbackInput: {
+    minHeight: 150,
+    paddingTop: Spacing.md,
+  },
+  feedbackNote: {
+    backgroundColor: isDark ? '#3B2D5B' : '#F3E8FF',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginTop: Spacing.md,
+  },
+  feedbackNoteText: {
+    ...Typography.caption,
+    color: isDark ? '#C4B5FD' : '#7C3AED',
+    lineHeight: 18,
   },
 });
 
