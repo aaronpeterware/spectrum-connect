@@ -1,5 +1,6 @@
 import { Platform, NativeModules, AppState, AppStateStatus } from 'react-native';
 import Constants from 'expo-constants';
+import * as Device from 'expo-device';
 
 // Check if Mixpanel native module is available
 const isMixpanelAvailable = (): boolean => {
@@ -32,6 +33,12 @@ const MIXPANEL_TOKEN = '0ba6bd275e95b8b1c2dc08946f2cdf39';
 // Singleton instance
 let mixpanelInstance: any = null;
 let isInitialized = false;
+let useHttpFallback = false;
+
+// User identification for HTTP fallback
+let currentUserId: string | null = null;
+let currentDistinctId: string | null = null;
+let superProperties: Record<string, any> = {};
 
 // Session tracking
 let sessionStartTime: number | null = null;
@@ -43,6 +50,98 @@ let paywallOpenTime: number | null = null;
 // App state tracking for background/foreground
 let lastBackgroundTime: number | null = null;
 
+// Generate a unique device ID for anonymous tracking
+const generateDeviceId = (): string => {
+  const timestamp = Date.now().toString(36);
+  const randomStr = Math.random().toString(36).substring(2, 15);
+  return `${Platform.OS}_${timestamp}_${randomStr}`;
+};
+
+// HTTP fallback for tracking when native module isn't available
+const trackViaHttp = async (eventName: string, properties?: Record<string, any>): Promise<void> => {
+  try {
+    const distinctId = currentDistinctId || currentUserId || generateDeviceId();
+
+    const eventData = {
+      event: eventName,
+      properties: {
+        token: MIXPANEL_TOKEN,
+        distinct_id: distinctId,
+        time: Math.floor(Date.now() / 1000),
+        $insert_id: `${Date.now()}_${Math.random().toString(36).substring(7)}`,
+        ...superProperties,
+        ...properties,
+        mp_lib: 'react-native-http',
+      },
+    };
+
+    const base64Data = btoa(JSON.stringify([eventData]));
+
+    const response = await fetch(`https://api.mixpanel.com/track?ip=1&verbose=1`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `data=${encodeURIComponent(base64Data)}`,
+    });
+
+    const result = await response.json();
+
+    if (__DEV__) {
+      console.log('[Analytics] HTTP Track:', eventName, result.status === 1 ? '✓' : '✗');
+    }
+  } catch (error) {
+    console.error('[Analytics] HTTP track error:', error);
+  }
+};
+
+// HTTP fallback for identifying users
+const identifyViaHttp = async (userId: string, userProperties?: Record<string, any>): Promise<void> => {
+  try {
+    currentUserId = userId;
+    currentDistinctId = userId;
+
+    // Create alias if needed (link anonymous to user ID)
+    const aliasData = {
+      event: '$create_alias',
+      properties: {
+        token: MIXPANEL_TOKEN,
+        distinct_id: userId,
+        alias: currentDistinctId,
+      },
+    };
+
+    // Set user profile
+    if (userProperties) {
+      const profileData = {
+        $token: MIXPANEL_TOKEN,
+        $distinct_id: userId,
+        $set: {
+          ...userProperties,
+          $name: userProperties.name,
+          $email: userProperties.email,
+        },
+      };
+
+      const base64Data = btoa(JSON.stringify([profileData]));
+
+      await fetch('https://api.mixpanel.com/engage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `data=${encodeURIComponent(base64Data)}`,
+      });
+    }
+
+    if (__DEV__) {
+      console.log('[Analytics] HTTP Identify:', userId);
+    }
+  } catch (error) {
+    console.error('[Analytics] HTTP identify error:', error);
+  }
+};
+
 /**
  * Initialize Mixpanel analytics
  * Call this once when the app starts
@@ -53,11 +152,28 @@ export async function initAnalytics(): Promise<void> {
     return;
   }
 
+  // Generate a distinct ID for this device
+  currentDistinctId = generateDeviceId();
+
   const MixpanelClass = loadMixpanel();
 
   if (!MixpanelClass) {
-    console.warn('[Analytics] Mixpanel native module not available - analytics will be mocked');
+    console.log('[Analytics] Native module not available - using HTTP fallback');
+    useHttpFallback = true;
     isInitialized = true;
+    sessionStartTime = Date.now();
+
+    // Set default super properties
+    superProperties = {
+      platform: Platform.OS,
+      app_version: Constants.expoConfig?.version || '1.0.0',
+      device_brand: Device.brand || 'unknown',
+      device_model: Device.modelName || 'unknown',
+      os_version: Device.osVersion || 'unknown',
+    };
+
+    // Track that analytics was initialized via HTTP
+    await trackViaHttp('$mp_init', { method: 'http_fallback' });
     return;
   }
 
@@ -75,10 +191,12 @@ export async function initAnalytics(): Promise<void> {
     isInitialized = true;
     sessionStartTime = Date.now();
 
-    console.log('[Analytics] Mixpanel initialized successfully');
+    console.log('[Analytics] Mixpanel initialized successfully (native)');
   } catch (error) {
-    console.error('[Analytics] Initialization error:', error);
-    isInitialized = true; // Set to true to prevent repeated init attempts
+    console.error('[Analytics] Native init error, falling back to HTTP:', error);
+    useHttpFallback = true;
+    isInitialized = true;
+    sessionStartTime = Date.now();
   }
 }
 
@@ -86,8 +204,13 @@ export async function initAnalytics(): Promise<void> {
  * Identify a user with their unique ID and properties
  */
 export function identify(userId: string, userProperties?: Record<string, any>): void {
+  if (useHttpFallback) {
+    identifyViaHttp(userId, userProperties);
+    return;
+  }
+
   if (!mixpanelInstance) {
-    console.log('[Analytics] Mock identify:', userId, userProperties);
+    console.log('[Analytics] Not initialized, cannot identify');
     return;
   }
 
@@ -108,8 +231,15 @@ export function identify(userId: string, userProperties?: Record<string, any>): 
  * Set user profile properties
  */
 export function setUserProperties(properties: Record<string, any>): void {
+  if (useHttpFallback) {
+    if (currentUserId) {
+      identifyViaHttp(currentUserId, properties);
+    }
+    return;
+  }
+
   if (!mixpanelInstance) {
-    console.log('[Analytics] Mock setUserProperties:', properties);
+    console.log('[Analytics] Not initialized, cannot set user properties');
     return;
   }
 
@@ -124,17 +254,22 @@ export function setUserProperties(properties: Record<string, any>): void {
  * Track a custom event
  */
 export function track(eventName: string, properties?: Record<string, any>): void {
+  const enhancedProperties = {
+    ...properties,
+    timestamp: new Date().toISOString(),
+  };
+
+  if (useHttpFallback) {
+    trackViaHttp(eventName, enhancedProperties);
+    return;
+  }
+
   if (!mixpanelInstance) {
-    console.log('[Analytics] Mock track:', eventName, properties);
+    console.log('[Analytics] Not initialized, cannot track:', eventName);
     return;
   }
 
   try {
-    const enhancedProperties = {
-      ...properties,
-      timestamp: new Date().toISOString(),
-    };
-
     mixpanelInstance.track(eventName, enhancedProperties);
 
     if (__DEV__) {
@@ -163,8 +298,17 @@ export function trackScreen(screenName: string, properties?: Record<string, any>
  * Reset analytics (call on logout)
  */
 export function resetAnalytics(): void {
+  if (useHttpFallback) {
+    currentUserId = null;
+    currentDistinctId = generateDeviceId();
+    currentScreen = null;
+    previousScreen = null;
+    console.log('[Analytics] Reset complete (HTTP)');
+    return;
+  }
+
   if (!mixpanelInstance) {
-    console.log('[Analytics] Mock reset');
+    console.log('[Analytics] Not initialized, cannot reset');
     return;
   }
 
@@ -573,6 +717,16 @@ export function trackSettingsChanged(settingName: string, newValue: any): void {
   });
 }
 
+/**
+ * Track feedback submitted
+ */
+export function trackFeedbackSubmitted(category: string, rating: number | null): void {
+  track('feedback_submitted', {
+    category,
+    rating,
+  });
+}
+
 // ============================================
 // ERROR EVENTS
 // ============================================
@@ -631,6 +785,11 @@ export function getOnboardingDuration(): number {
  * Flush events (force send to Mixpanel)
  */
 export function flushEvents(): void {
+  if (useHttpFallback) {
+    // HTTP requests are sent immediately, no flush needed
+    return;
+  }
+
   if (!mixpanelInstance) {
     return;
   }
@@ -688,6 +847,7 @@ export default {
   trackLessonStarted,
   trackLessonCompleted,
   trackSettingsChanged,
+  trackFeedbackSubmitted,
   // Errors
   trackError,
   trackApiError,
