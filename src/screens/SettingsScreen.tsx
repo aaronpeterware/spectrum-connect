@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,9 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -23,6 +25,7 @@ import { useSettings } from '../context/SettingsContext';
 import { useTheme } from '../hooks/useTheme';
 import * as ImagePicker from 'expo-image-picker';
 import MenuModal from '../components/MenuModal';
+import { getPushToken, sendTestNotification } from '../services/notificationService';
 
 type RootStackParamList = {
   PrivacySecurity: undefined;
@@ -51,6 +54,45 @@ const SettingsScreen = () => {
   const [editBio, setEditBio] = useState(user.bio || '');
   const [editLocation, setEditLocation] = useState(user.location || '');
   const [menuVisible, setMenuVisible] = useState(false);
+  const [pushToken, setPushToken] = useState<string | null>(null);
+  const [sendingTest, setSendingTest] = useState(false);
+
+  // Load push token on mount
+  useEffect(() => {
+    const loadPushToken = async () => {
+      const token = await getPushToken();
+      setPushToken(token);
+    };
+    loadPushToken();
+  }, []);
+
+  const handleCopyToken = async () => {
+    if (pushToken) {
+      await Clipboard.setStringAsync(pushToken);
+      triggerHaptic('success');
+      Alert.alert('Copied!', 'Push token copied to clipboard');
+    }
+  };
+
+  const handleSendTestNotification = async () => {
+    if (!pushToken) {
+      Alert.alert('No Token', 'Push token not available. Make sure notifications are enabled.');
+      return;
+    }
+
+    setSendingTest(true);
+    triggerHaptic('light');
+
+    const success = await sendTestNotification(pushToken);
+
+    setSendingTest(false);
+
+    if (success) {
+      Alert.alert('Sent!', 'Test notification sent. Background the app to see it.');
+    } else {
+      Alert.alert('Error', 'Failed to send test notification.');
+    }
+  };
 
   const handleOpenEdit = () => {
     triggerHaptic('light');
@@ -283,6 +325,40 @@ const SettingsScreen = () => {
               value={settings.notificationsEnabled}
               onValueChange={setNotificationsEnabled}
             />
+            <View style={styles.divider} />
+            {/* Push Token Display */}
+            <View style={styles.tokenSection}>
+              <Text style={styles.tokenLabel}>Push Token:</Text>
+              {pushToken ? (
+                <TouchableOpacity onPress={handleCopyToken} style={styles.tokenContainer}>
+                  <Text style={styles.tokenText} numberOfLines={1} ellipsizeMode="middle">
+                    {pushToken}
+                  </Text>
+                  <Ionicons name="copy-outline" size={18} color={colors.primary} />
+                </TouchableOpacity>
+              ) : (
+                <Text style={styles.tokenUnavailable}>Not available</Text>
+              )}
+            </View>
+            <View style={styles.divider} />
+            {/* Test Notification Button */}
+            <TouchableOpacity
+              style={styles.testNotificationButton}
+              onPress={handleSendTestNotification}
+              disabled={sendingTest || !pushToken}
+            >
+              <Ionicons
+                name="notifications-outline"
+                size={20}
+                color={pushToken ? colors.primary : colors.textTertiary}
+              />
+              <Text style={[
+                styles.testNotificationText,
+                !pushToken && styles.testNotificationTextDisabled
+              ]}>
+                {sendingTest ? 'Sending...' : 'Send Test Notification'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -794,6 +870,51 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
   themeOptionTextSelected: {
     color: colors.primary,
     fontWeight: '600',
+  },
+  // Push token styles
+  tokenSection: {
+    padding: Spacing.lg,
+  },
+  tokenLabel: {
+    ...Typography.bodySmall,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: Spacing.xs,
+  },
+  tokenContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  tokenText: {
+    ...Typography.caption,
+    color: colors.text,
+    flex: 1,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  tokenUnavailable: {
+    ...Typography.caption,
+    color: colors.textTertiary,
+    fontStyle: 'italic',
+  },
+  testNotificationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  testNotificationText: {
+    ...Typography.body,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  testNotificationTextDisabled: {
+    color: colors.textTertiary,
   },
 });
 

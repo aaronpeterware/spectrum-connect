@@ -103,9 +103,13 @@ export const registerForPushNotifications = async (): Promise<string | null> => 
     }
 
     // Get the Expo push token
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+    if (!projectId) {
+      console.error('Project ID not found');
+      return null;
+    }
     const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: projectId || 'a7ef7c6f-2a67-4f45-83fe-de4844867461',
+      projectId,
     });
 
     // Configure Android channel
@@ -605,6 +609,75 @@ export const clearBadge = async (): Promise<void> => {
   await Notifications.setBadgeCountAsync(0);
 };
 
+/**
+ * Get current push token (returns cached token if available)
+ */
+let cachedPushToken: string | null = null;
+
+export const getPushToken = async (): Promise<string | null> => {
+  if (cachedPushToken) return cachedPushToken;
+
+  initializeNativeModules();
+  if (!Notifications || !isNotificationsAvailable || !Device) {
+    return null;
+  }
+
+  try {
+    if (!Device.isDevice) {
+      return null;
+    }
+
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
+      return null;
+    }
+
+    const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+    if (!projectId) {
+      return null;
+    }
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+    cachedPushToken = tokenData.data;
+    return cachedPushToken;
+  } catch (error) {
+    console.error('Error getting push token:', error);
+    return null;
+  }
+};
+
+/**
+ * Send a test notification to your own device
+ */
+export const sendTestNotification = async (expoPushToken: string): Promise<boolean> => {
+  const message = {
+    to: expoPushToken,
+    sound: 'default',
+    title: 'Test Notification',
+    body: 'Push notifications are working!',
+    data: { type: 'test' },
+  };
+
+  try {
+    const response = await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Accept-encoding': 'gzip, deflate',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(message),
+    });
+
+    const result = await response.json();
+    console.log('Test notification result:', result);
+    return response.ok;
+  } catch (error) {
+    console.error('Error sending test notification:', error);
+    return false;
+  }
+};
+
 export default {
   registerForPushNotifications,
   savePushToken,
@@ -627,4 +700,6 @@ export default {
   getBadgeCount,
   setBadgeCount,
   clearBadge,
+  getPushToken,
+  sendTestNotification,
 };
